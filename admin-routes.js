@@ -62,11 +62,8 @@ router.post('/users', async (req, res) => {
     return res.status(400).json({ error: 'Número y nombre son requeridos' });
   }
   
-  // Asegurar formato correcto del número
-  let formattedNumber = phone_number.replace(/\s+/g, '');
-  if (!formattedNumber.startsWith('+')) {
-    formattedNumber = '+' + formattedNumber;
-  }
+  // Limpiar número - quitar espacios y el + si existe
+  let formattedNumber = phone_number.replace(/\s+/g, '').replace(/^\+/, '');
   
   try {
     const [result] = await pool.query(
