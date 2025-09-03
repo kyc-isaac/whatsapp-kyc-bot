@@ -525,7 +525,8 @@ _Sistema KYC-LISTAS v1.0_`;
 
 // Endpoint principal para webhook de WhatsApp
 app.post("/webhook", async (req, res) => {
-  const from = req.body.From;
+  // Limpiar el formato del número - quitar espacios extras
+  const from = req.body.From?.replace(/\s+/g, '') || '';
   const body = req.body.Body?.trim() || "";
 
   log(`Mensaje recibido de ${from}: ${body}`);
