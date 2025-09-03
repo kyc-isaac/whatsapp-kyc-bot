@@ -1,0 +1,26 @@
+# Variables de entorno
+.env
+
+# Dependencias de Node.js
+node_modules/
+
+# Archivos temporales
+temp/
+*.tmp
+
+# Logs
+logs/
+*.log
+
+# Archivos de sistema
+.DS_Store
+Thumbs.db
+
+# Archivos de IDE
+.vscode/
+.idea/
+
+# Archivos de backup
+*.bak
+
+SETUP_DOCUMENTATION.md

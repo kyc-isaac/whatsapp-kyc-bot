@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel de Administración - KYC WhatsApp Bot</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+
+        .header h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .stat-card {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .stat-label {
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .main-panel {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+
+        .toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5a67d8;
+        }
+
+        .btn-success {
+            background: #48bb78;
+            color: white;
+        }
+
+        .btn-danger {
+            background: #f56565;
+            color: white;
+        }
+
+        .btn-warning {
+            background: #ed8936;
+            color: white;
+        }
+
+        .search-box {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            width: 300px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            text-align: left;
+            padding: 12px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        th {
+            background: #f7fafc;
+            font-weight: 600;
+            color: #4a5568;
+        }
+
+        tr:hover {
+            background: #f7fafc;
+        }
+
+        .status-active {
+            background: #c6f6d5;
+            color: #22543d;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+
+        .status-inactive {
+            background: #fed7d7;
+            color: #742a2a;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            width: 90%;
+            max-width: 500px;
+        }
+
+        .modal h2 {
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        .error {
+            background: #fed7d7;
+            color: #742a2a;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+
+        .success {
+            background: #c6f6d5;
+            color: #22543d;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .toolbar {
+                flex-direction: column;
+            }
+            
+            .search-box {
+                width: 100%;
+            }
+
+            table {
+                font-size: 14px;
+            }
+
+            th, td {
+                padding: 8px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔐 Panel de Administración - KYC WhatsApp Bot</h1>
+            <div class="stats" id="stats">
+                <div class="stat-card">
+                    <div class="stat-value">-</div>
+                    <div class="stat-label">Usuarios Totales</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">-</div>
+                    <div class="stat-label">Activos Hoy</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">-</div>
+                    <div class="stat-label">Consultas Totales</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">-</div>
+                    <div class="stat-label">Bloqueados Hoy</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="main-panel">
+            <div class="toolbar">
+                <div>
+                    <button class="btn btn-primary" onclick="showAddModal()">➕ Agregar Usuario</button>
+                    <button class="btn btn-success" onclick="loadUsers()">🔄 Actualizar</button>
+                </div>
+                <input type="text" class="search-box" id="searchBox" placeholder="Buscar por nombre o teléfono..." onkeyup="filterUsers()">
+            </div>
+
+            <div id="message"></div>
+
+            <div id="content">
+                <div class="loading">Cargando usuarios...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para agregar/editar usuario -->
+    <div class="modal" id="userModal">
+        <div class="modal-content">
+            <h2 id="modalTitle">Agregar Usuario</h2>
+            <form id="userForm">
+                <input type="hidden" id="userId">
+                <div class="form-group">
+                    <label>Número de WhatsApp:</label>
+                    <input type="text" id="phoneNumber" placeholder="+52XXXXXXXXXX" required>
+                </div>
+                <div class="form-group">
+                    <label>Nombre Completo:</label>
+                    <input type="text" id="fullName" required>
+                </div>
+                <div class="form-group">
+                    <label>Empresa (opcional):</label>
+                    <input type="text" id="company">
+                </div>
+                <div class="form-group" id="statusGroup" style="display: none;">
+                    <label>Estado:</label>
+                    <select id="isActive">
+                        <option value="1">Activo</option>
+                        <option value="0">Inactivo</option>
+                    </select>
+                </div>
+                <div class="modal-buttons">
+                    <button type="button" class="btn btn-danger" onclick="closeModal()">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        let users = [];
+        const API_BASE = '/api/admin';
+
+        // Cargar usuarios al inicio
+        document.addEventListener('DOMContentLoaded', () => {
+            loadUsers();
+            loadStats();
+        });
+
+        async function loadStats() {
+            try {
+                const response = await fetch(`${API_BASE}/stats`);
+                const stats = await response.json();
+                
+                const statCards = document.querySelectorAll('.stat-value');
+                statCards[0].textContent = stats.totalUsers;
+                statCards[1].textContent = stats.activeToday;
+                statCards[2].textContent = stats.totalQueries;
+                statCards[3].textContent = stats.blockedToday;
+            } catch (error) {
+                console.error('Error cargando estadísticas:', error);
+            }
+        }
+
+        async function loadUsers() {
+            try {
+                const response = await fetch(`${API_BASE}/users`);
+                if (!response.ok) throw new Error('Error al cargar usuarios');
+                
+                users = await response.json();
+                renderUsers(users);
+                showMessage('Usuarios cargados exitosamente', 'success');
+            } catch (error) {
+                console.error('Error:', error);
+                showMessage('Error al cargar usuarios', 'error');
+            }
+        }
+
+        function renderUsers(usersToRender) {
+            const content = document.getElementById('content');
+            
+            if (usersToRender.length === 0) {
+                content.innerHTML = '<div class="loading">No hay usuarios registrados</div>';
+                return;
+            }
+
+            let html = `
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Teléfono</th>
+                            <th>Nombre</th>
+                            <th>Empresa</th>
+                            <th>Estado</th>
+                            <th>Consultas</th>
+                            <th>Último Acceso</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            usersToRender.forEach(user => {
+                const lastAccess = user.last_access ? new Date(user.last_access).toLocaleString() : 'Nunca';
+                const statusClass = user.is_active ? 'status-active' : 'status-inactive';
+                const statusText = user.is_active ? 'Activo' : 'Inactivo';
+                
+                html += `
+                    <tr>
+                        <td>${user.id}</td>
+                        <td>${user.phone_number}</td>
+                        <td>${user.full_name}</td>
+                        <td>${user.company || '-'}</td>
+                        <td><span class="${statusClass}">${statusText}</span></td>
+                        <td>${user.total_queries}</td>
+                        <td>${lastAccess}</td>
+                        <td>
+                            <button class="btn btn-warning" onclick="editUser(${user.id})">✏️</button>
+                            <button class="btn btn-danger" onclick="deleteUser(${user.id})">🗑️</button>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            html += '</tbody></table>';
+            content.innerHTML = html;
+        }
+
+        function filterUsers() {
+            const search = document.getElementById('searchBox').value.toLowerCase();
+            const filtered = users.filter(user => 
+                user.full_name.toLowerCase().includes(search) ||
+                user.phone_number.includes(search) ||
+                (user.company && user.company.toLowerCase().includes(search))
+            );
+            renderUsers(filtered);
+        }
+
+        function showAddModal() {
+            document.getElementById('modalTitle').textContent = 'Agregar Usuario';
+            document.getElementById('userForm').reset();
+            document.getElementById('userId').value = '';
+            document.getElementById('statusGroup').style.display = 'none';
+            document.getElementById('userModal').classList.add('active');
+        }
+
+        function editUser(id) {
+            const user = users.find(u => u.id === id);
+            if (!user) return;
+
+            document.getElementById('modalTitle').textContent = 'Editar Usuario';
+            document.getElementById('userId').value = user.id;
+            document.getElementById('phoneNumber').value = user.phone_number;
+            document.getElementById('fullName').value = user.full_name;
+            document.getElementById('company').value = user.company || '';
+            document.getElementById('isActive').value = user.is_active ? '1' : '0';
+            document.getElementById('statusGroup').style.display = 'block';
+            document.getElementById('userModal').classList.add('active');
+        }
+
+        function closeModal() {
+            document.getElementById('userModal').classList.remove('active');
+        }
+
+        document.getElementById('userForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const userId = document.getElementById('userId').value;
+            const data = {
+                phone_number: document.getElementById('phoneNumber').value,
+                full_name: document.getElementById('fullName').value,
+                company: document.getElementById('company').value || null,
+                is_active: document.getElementById('isActive').value === '1'
+            };
+
+            try {
+                let response;
+                if (userId) {
+                    // Editar usuario
+                    response = await fetch(`${API_BASE}/users/${userId}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(data)
+                    });
+                } else {
+                    // Agregar usuario
+                    response = await fetch(`${API_BASE}/users`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(data)
+                    });
+                }
+
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showMessage(result.message || 'Operación exitosa', 'success');
+                    closeModal();
+                    loadUsers();
+                    loadStats();
+                } else {
+                    showMessage(result.error || 'Error en la operación', 'error');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showMessage('Error al procesar la solicitud', 'error');
+            }
+        });
+
+        async function deleteUser(id) {
+            if (!confirm('¿Está seguro de eliminar este usuario?')) return;
+
+            try {
+                const response = await fetch(`${API_BASE}/users/${id}`, {
+                    method: 'DELETE'
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showMessage('Usuario eliminado exitosamente', 'success');
+                    loadUsers();
+                    loadStats();
+                } else {
+                    showMessage(result.error || 'Error al eliminar', 'error');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showMessage('Error al eliminar usuario', 'error');
+            }
+        }
+
+        function showMessage(text, type) {
+            const messageDiv = document.getElementById('message');
+            messageDiv.className = type;
+            messageDiv.textContent = text;
+            messageDiv.style.display = 'block';
+            
+            setTimeout(() => {
+                messageDiv.style.display = 'none';
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
