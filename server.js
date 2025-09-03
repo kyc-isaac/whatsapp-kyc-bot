@@ -523,6 +523,12 @@ _Sistema KYC-LISTAS v1.0_`;
   }, 3000);
 }
 
+// Endpoint para status de mensajes
+app.post("/webhook/status", (req, res) => {
+  console.log("Status callback:", req.body);
+  res.status(200).send("OK");
+});
+
 // Endpoint principal para webhook de WhatsApp
 app.post("/webhook", async (req, res) => {
   // Limpiar el formato del número - quitar espacios extras
