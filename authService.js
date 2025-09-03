@@ -4,7 +4,13 @@ const path = require('path');
 
 // Función para limpiar número de teléfono (quitar 'whatsapp:' y espacios)
 function cleanPhoneNumber(phoneNumber) {
-  return phoneNumber.replace('whatsapp:', '').replace(/\s/g, '').trim();
+  // Quitar "whatsapp:" y espacios, luego asegurar que tenga +
+  let cleaned = phoneNumber.replace('whatsapp:', '').replace(/\s/g, '').trim();
+  // Si no empieza con +, agregarlo
+  if (!cleaned.startsWith('+')) {
+    cleaned = '+' + cleaned;
+  }
+  return cleaned;
 }
 
 // Verificar si un número está autorizado
