@@ -434,6 +434,20 @@
                         <option value="0">Inactivo</option>
                     </select>
                 </div>
+                <div class="form-group">
+                    <label>Límite de Búsquedas Diarias:</label>
+                    <select id="searchLimit">
+                        <option value="unlimited">Ilimitadas</option>
+                        <option value="100" selected>Estándar (100)</option>
+                        <option value="50">Medio (50)</option>
+                        <option value="10">Básico (10)</option>
+                        <option value="custom">Personalizado...</option>
+                    </select>
+                </div>
+                <div class="form-group" id="customSearchLimitGroup" style="display: none;">
+                    <label>Límite personalizado:</label>
+                    <input type="number" id="customSearchLimit" min="1" max="10000" placeholder="Ej: 75">
+                </div>
                 <div class="modal-buttons">
                     <button type="button" class="btn btn-danger" onclick="closeModal()">Cancelar</button>
                     <button type="submit" class="btn btn-primary">Guardar</button>
@@ -534,6 +548,7 @@
                             <th>Nombre</th>
                             <th>Empresa</th>
                             <th>Estado</th>
+                            <th>Límite Diario</th>
                             <th>Consultas</th>
                             <th>Último Acceso</th>
                             <th>Acciones</th>
@@ -547,6 +562,18 @@
                 const statusClass = user.is_active ? 'status-active' : 'status-inactive';
                 const statusText = user.is_active ? 'Activo' : 'Inactivo';
                 
+                // Formatear límite de búsquedas
+                let searchLimitText = user.search_limit;
+                let limitClass = 'limit-standard';
+                if (user.search_limit === -1) {
+                    searchLimitText = 'Ilimitado';
+                    limitClass = 'limit-unlimited';
+                } else if (user.search_limit <= 10) {
+                    limitClass = 'limit-limited';
+                } else if (user.search_limit >= 100) {
+                    limitClass = 'limit-standard';
+                }
+                
                 html += `
                     <tr>
                         <td>${user.id}</td>
@@ -554,6 +581,7 @@
                         <td>${user.full_name}</td>
                         <td>${user.company || '-'}</td>
                         <td><span class="${statusClass}">${statusText}</span></td>
+                        <td><span class="limit-badge ${limitClass}">${searchLimitText}</span></td>
                         <td>${user.total_queries}</td>
                         <td>${lastAccess}</td>
                         <td>
@@ -597,6 +625,23 @@
             document.getElementById('company').value = user.company || '';
             document.getElementById('isActive').value = user.is_active ? '1' : '0';
             document.getElementById('statusGroup').style.display = 'block';
+            
+            // Configurar search limit
+            const searchLimitSelect = document.getElementById('searchLimit');
+            if (user.search_limit === -1) {
+                searchLimitSelect.value = 'unlimited';
+            } else if (user.search_limit === 100) {
+                searchLimitSelect.value = '100';
+            } else if (user.search_limit === 50) {
+                searchLimitSelect.value = '50';
+            } else if (user.search_limit === 10) {
+                searchLimitSelect.value = '10';
+            } else {
+                searchLimitSelect.value = 'custom';
+                document.getElementById('customSearchLimit').value = user.search_limit;
+                document.getElementById('customSearchLimitGroup').style.display = 'block';
+            }
+            
             document.getElementById('userModal').classList.add('active');
         }
 
@@ -604,15 +649,40 @@
             document.getElementById('userModal').classList.remove('active');
         }
 
+        // Función para manejar el cambio del dropdown de límites
+        document.getElementById('searchLimit').addEventListener('change', function() {
+            const value = this.value;
+            const customGroup = document.getElementById('customSearchLimitGroup');
+            
+            if (value === 'custom') {
+                customGroup.style.display = 'block';
+            } else {
+                customGroup.style.display = 'none';
+            }
+        });
+
         document.getElementById('userForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             
             const userId = document.getElementById('userId').value;
+            // Calcular search_limit
+            const searchLimitSelect = document.getElementById('searchLimit');
+            let searchLimit = 100; // Default
+            
+            if (searchLimitSelect.value === 'unlimited') {
+                searchLimit = -1;
+            } else if (searchLimitSelect.value === 'custom') {
+                searchLimit = parseInt(document.getElementById('customSearchLimit').value) || 100;
+            } else {
+                searchLimit = parseInt(searchLimitSelect.value) || 100;
+            }
+            
             const data = {
                 phone_number: document.getElementById('phoneNumber').value,
                 full_name: document.getElementById('fullName').value,
                 company: document.getElementById('company').value || null,
-                is_active: document.getElementById('isActive').value === '1'
+                is_active: document.getElementById('isActive').value === '1',
+                search_limit: searchLimit
             };
 
             try {
