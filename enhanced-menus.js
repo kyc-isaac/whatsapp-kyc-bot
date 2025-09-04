@@ -39,16 +39,19 @@ Selecciona el tipo de búsqueda:
 
 *TIPO DE ENTIDAD*
 1️⃣ 👤 *Persona Física*
+      _Nombre y apellidos separados_
+
+2️⃣ 👤 *Persona Física - Nombre Completo*
       _Búsqueda por nombre completo_
 
-2️⃣ 🏢 *Empresa / Razón Social*
+3️⃣ 🏢 *Empresa / Razón Social*
       _Búsqueda por nombre comercial_
 
 *BÚSQUEDAS ESPECIALES*
-3️⃣ 📊 *Búsqueda Masiva*
+4️⃣ 📊 *Búsqueda Masiva*
       _Hasta 10 registros simultáneos_
 
-4️⃣ ⚙️ *Búsqueda Avanzada*
+5️⃣ ⚙️ *Búsqueda Avanzada*
       _Con parámetros específicos_
 
 ━━━━━━━━━━━━━━━━━━
@@ -447,6 +450,37 @@ function getUserStats(stats) {
 2️⃣ 🏠 *Menú Principal*`;
 }
 
+/**
+ * Mensaje de Límite de Búsquedas Alcanzado
+ */
+function getSearchLimitMessage(currentSearches, maxSearches, resetTime) {
+  return `🚫 *Límite de Búsquedas Alcanzado*
+━━━━━━━━━━━━━━━━━━
+
+Has alcanzado tu límite diario de búsquedas.
+
+*Estado actual:*
+• Búsquedas realizadas: *${currentSearches}/${maxSearches}*
+• Límite diario: *${maxSearches} búsquedas*
+• Se restablece: *${resetTime}*
+
+*¿Necesitas más búsquedas?*
+
+💬 Contacta a nuestro equipo de soporte:
+
+📧 *Email:* hola@kyc-systems.com
+📞 *Teléfono:* +52 55 4762 6178
+
+Ellos podrán ayudarte a:
+• Aumentar tu límite diario
+• Revisar tu plan actual
+• Configurar un plan personalizado
+
+━━━━━━━━━━━━━━━━━━
+1️⃣ 💬 *Contactar Soporte*
+2️⃣ 🏠 *Menú Principal*`;
+}
+
 module.exports = {
   getEnhancedMainMenu,
   getSearchTypeMenu,
@@ -459,5 +493,6 @@ module.exports = {
   getWelcomeMessage,
   getSessionExpiredMessage,
   getRecentSearches,
-  getUserStats
+  getUserStats,
+  getSearchLimitMessage
 };

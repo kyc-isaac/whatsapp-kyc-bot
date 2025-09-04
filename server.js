@@ -35,6 +35,77 @@ const KYC_API_KEY = process.env.KYC_API_KEY;
 // Store para mantener el estado de conversación de cada usuario
 const userSessions = new Map();
 
+// Sistema de límites de búsqueda diarios
+const userSearchLimits = new Map(); // Configuración de límites por usuario
+const userDailySearches = new Map(); // Contador de búsquedas diarias por usuario
+
+// Configuración de límites por defecto
+const DEFAULT_SEARCH_LIMITS = {
+  unlimited: -1, // -1 significa ilimitado
+  standard: 100,
+  limited: 10
+};
+
+// Función para obtener/inicializar límites de usuario
+function getUserSearchLimit(phoneNumber) {
+  if (!userSearchLimits.has(phoneNumber)) {
+    // Por defecto, usuarios nuevos tienen límite de 100 búsquedas
+    userSearchLimits.set(phoneNumber, DEFAULT_SEARCH_LIMITS.standard);
+  }
+  return userSearchLimits.get(phoneNumber);
+}
+
+// Función para obtener contador diario
+function getDailySearchCount(phoneNumber) {
+  const today = new Date().toDateString();
+  const key = `${phoneNumber}_${today}`;
+  
+  if (!userDailySearches.has(key)) {
+    userDailySearches.set(key, 0);
+  }
+  return userDailySearches.get(key);
+}
+
+// Función para incrementar contador diario
+function incrementDailySearchCount(phoneNumber) {
+  const today = new Date().toDateString();
+  const key = `${phoneNumber}_${today}`;
+  const currentCount = getDailySearchCount(phoneNumber);
+  userDailySearches.set(key, currentCount + 1);
+  return currentCount + 1;
+}
+
+// Función para verificar si el usuario puede realizar una búsqueda
+function canUserSearch(phoneNumber) {
+  const userLimit = getUserSearchLimit(phoneNumber);
+  
+  // Si es ilimitado (-1), siempre puede buscar
+  if (userLimit === -1) {
+    return { canSearch: true, current: getDailySearchCount(phoneNumber), max: 'Ilimitadas' };
+  }
+  
+  const currentCount = getDailySearchCount(phoneNumber);
+  return { 
+    canSearch: currentCount < userLimit, 
+    current: currentCount, 
+    max: userLimit 
+  };
+}
+
+// Función para establecer límite de usuario (uso administrativo)
+function setUserSearchLimit(phoneNumber, limit) {
+  userSearchLimits.set(phoneNumber, limit);
+  log(`Límite de búsquedas establecido para ${authService.maskPhoneNumber(phoneNumber)}: ${limit === -1 ? 'Ilimitado' : limit}`);
+}
+
+// Función para obtener hora de reset (medianoche del día siguiente)
+function getResetTime() {
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  tomorrow.setHours(0, 0, 0, 0);
+  return tomorrow.toLocaleString();
+}
+
 // Estados de conversación
 const STATES = {
   UNAUTHORIZED: "unauthorized",
@@ -164,6 +235,10 @@ async function searchKYC(searchData) {
     );
 
     log(`Búsqueda KYC completada: ${response.data.coincidences} coincidencias`);
+    
+    // Incrementar contador de búsquedas diarias para el usuario
+    // (Se agregará desde donde se llama esta función para tener acceso al 'from')
+    
     return response.data;
   } catch (error) {
     log(
@@ -266,14 +341,13 @@ Para usar el sistema, selecciona una opción:
 async function handlePersonType(from, body, session) {
   const option = body.trim();
 
-  if (option === "1" || option === "2") {
-    session.data.persona = option;
-    session.data.porcentaje_min = 98; // Establecer porcentaje por defecto
+  if (option === "1") {
+    // Persona Física - Nombres separados
+    session.data.persona = "1";
+    session.data.porcentaje_min = 98;
     session.state = STATES.WAITING_NAME;
 
-    const nameMessage =
-      option === "1"
-        ? `👤 *Persona Física Seleccionada*
+    const nameMessage = `👤 *Persona Física Seleccionada*
 ━━━━━━━━━━━━━━━━━━
 
 📝 Escribe el *nombre(s)* de la persona:
@@ -282,8 +356,37 @@ async function handlePersonType(from, body, session) {
 💡 *Nota:* Solo el nombre, después te pediré los apellidos por separado.
 
 ━━━━━━━━━━━━━━━━━━
-↩️ Para cancelar, escribe *menu*`
-        : `🏢 *Persona Moral Seleccionada*
+↩️ Para cancelar, escribe *menu*`;
+
+    await sendWhatsAppMessage(from, nameMessage);
+    
+  } else if (option === "2") {
+    // Persona Física - Nombre completo (se envía al backend como persona moral tipo 2)
+    session.data.persona = "2"; // Se enviará como tipo 2 al backend
+    session.data.isFullNamePerson = true; // Flag para identificar que es persona física con nombre completo
+    session.data.porcentaje_min = 98;
+    session.state = STATES.WAITING_NAME;
+
+    const nameMessage = `👤 *Persona Física - Nombre Completo*
+━━━━━━━━━━━━━━━━━━
+
+📝 Escribe el *nombre completo* de la persona:
+
+*Ejemplo:* JUAN CARLOS PÉREZ GARCÍA
+💡 *Nota:* Escribe nombre y apellidos juntos.
+
+━━━━━━━━━━━━━━━━━━
+↩️ Para cancelar, escribe *menu*`;
+
+    await sendWhatsAppMessage(from, nameMessage);
+    
+  } else if (option === "3") {
+    // Persona Moral/Empresa
+    session.data.persona = "2";
+    session.data.porcentaje_min = 98;
+    session.state = STATES.WAITING_NAME;
+
+    const nameMessage = `🏢 *Persona Moral Seleccionada*
 ━━━━━━━━━━━━━━━━━━
 
 📝 Escribe la *razón social completa* de la empresa:
@@ -295,7 +398,7 @@ async function handlePersonType(from, body, session) {
 
     await sendWhatsAppMessage(from, nameMessage);
     
-  } else if (option === "4") {
+  } else if (option === "5") {
     // Opción de búsqueda avanzada
     session.state = STATES.ADVANCED_SEARCH;
     await sendWhatsAppMessage(from, `⚙️ *Búsqueda Avanzada*
@@ -311,9 +414,8 @@ Selecciona el tipo de configuración:
 ━━━━━━━━━━━━━━━━━━
 💡 *Nota:* 98% reduce falsos positivos
 ↩️ Escribe *menu* para volver`);
-    return;
-  
-  } else if (body.toLowerCase() === "menu") {
+    
+  } else if (option === "0" || body.toLowerCase() === "menu") {
     session.state = STATES.WELCOME;
     await handleWelcome(from, "", session);
   } else {
@@ -360,11 +462,14 @@ El nombre debe tener al menos *2 caracteres*.
 
   session.data.nombre = name.toUpperCase();
 
-  if (session.data.persona === "2") {
+  if (session.data.persona === "2" && session.data.isFullNamePerson) {
+    // Para persona física con nombre completo (se envía como persona moral)
+    await processSearch(from, session);
+  } else if (session.data.persona === "2") {
     // Para persona moral, procesar directamente
     await processSearch(from, session);
   } else {
-    // Para persona física, pedir apellido paterno
+    // Para persona física con apellidos separados, pedir apellido paterno
     session.state = STATES.WAITING_APATERNO;
     await sendWhatsAppMessage(
       from,
@@ -750,6 +855,26 @@ Selecciona una opción del menú de ayuda:
 }
 
 async function processSearch(from, session) {
+  // Verificar límite de búsquedas antes de procesar
+  const searchStatus = canUserSearch(from);
+  if (!searchStatus.canSearch) {
+    // Usuario ha alcanzado su límite diario
+    const resetTime = getResetTime();
+    const limitMessage = enhancedMenus.getSearchLimitMessage(
+      searchStatus.current,
+      searchStatus.max,
+      resetTime
+    );
+    await sendWhatsAppMessage(from, limitMessage);
+    
+    // Resetear sesión al menú principal
+    session.state = STATES.WELCOME;
+    session.data = {};
+    
+    log(`Usuario ${authService.maskPhoneNumber(from)} alcanzó límite diario: ${searchStatus.current}/${searchStatus.max}`);
+    return;
+  }
+
   session.state = STATES.PROCESSING;
 
   // Mostrar confirmación con el formato mejorado
@@ -781,6 +906,14 @@ async function processSearch(from, session) {
   if (session.data.amaterno) kycSearchData.amaterno = session.data.amaterno;
 
   const result = await searchKYC(kycSearchData);
+  
+  // Si la búsqueda fue exitosa (no hay error), incrementar contador
+  if (!result.err) {
+    const newCount = incrementDailySearchCount(from);
+    const userLimit = getUserSearchLimit(from);
+    log(`Búsqueda completada para ${authService.maskPhoneNumber(from)}: ${newCount}/${userLimit === -1 ? 'Ilimitadas' : userLimit}`);
+  }
+  
   await handleSearchResult(from, session, result);
 }
 
@@ -1032,6 +1165,127 @@ setInterval(() => {
 }, 6 * 60 * 60 * 1000); // Cada 6 horas
 
 const PORT = process.env.PORT || 3001;
+
+// Endpoints para administración de límites de usuarios
+app.get('/api/admin/user-limits', (req, res) => {
+  try {
+    const users = [];
+    
+    // Obtener todos los usuarios únicos de las sesiones y límites
+    const allUsers = new Set([...userSessions.keys(), ...userSearchLimits.keys()]);
+    
+    allUsers.forEach(phoneNumber => {
+      const limit = getUserSearchLimit(phoneNumber);
+      const todaySearches = getDailySearchCount(phoneNumber);
+      const isActive = userSessions.has(phoneNumber);
+      
+      users.push({
+        phoneNumber: authService.maskPhoneNumber(phoneNumber),
+        dailyLimit: limit === -1 ? 'Ilimitado' : limit,
+        todaySearches,
+        isActive,
+        lastActivity: isActive ? userSessions.get(phoneNumber).lastActivity : null
+      });
+    });
+    
+    res.json({
+      success: true,
+      users: users.sort((a, b) => b.todaySearches - a.todaySearches)
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+app.post('/api/admin/set-user-limit', (req, res) => {
+  try {
+    const { phoneNumber, limit } = req.body;
+    
+    if (!phoneNumber || limit === undefined) {
+      return res.status(400).json({
+        success: false,
+        error: 'Se requieren phoneNumber y limit'
+      });
+    }
+    
+    // Validar que el límite sea válido
+    const numLimit = parseInt(limit);
+    if (isNaN(numLimit) && limit !== 'unlimited') {
+      return res.status(400).json({
+        success: false,
+        error: 'El límite debe ser un número o "unlimited"'
+      });
+    }
+    
+    const finalLimit = limit === 'unlimited' ? -1 : numLimit;
+    setUserSearchLimit(phoneNumber, finalLimit);
+    
+    res.json({
+      success: true,
+      message: `Límite establecido para ${authService.maskPhoneNumber(phoneNumber)}: ${finalLimit === -1 ? 'Ilimitado' : finalLimit}`,
+      user: {
+        phoneNumber: authService.maskPhoneNumber(phoneNumber),
+        newLimit: finalLimit === -1 ? 'Ilimitado' : finalLimit,
+        todaySearches: getDailySearchCount(phoneNumber)
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+app.get('/api/admin/search-stats', (req, res) => {
+  try {
+    const today = new Date().toDateString();
+    const stats = {
+      totalUsersToday: 0,
+      totalSearchesToday: 0,
+      activeUsers: userSessions.size,
+      limitReachedUsers: 0,
+      userBreakdown: []
+    };
+    
+    // Calcular estadísticas de búsquedas de hoy
+    userDailySearches.forEach((count, key) => {
+      if (key.endsWith(`_${today}`)) {
+        const phoneNumber = key.replace(`_${today}`, '');
+        const userLimit = getUserSearchLimit(phoneNumber);
+        const hasReachedLimit = userLimit !== -1 && count >= userLimit;
+        
+        stats.totalUsersToday++;
+        stats.totalSearchesToday += count;
+        if (hasReachedLimit) stats.limitReachedUsers++;
+        
+        stats.userBreakdown.push({
+          user: authService.maskPhoneNumber(phoneNumber),
+          searches: count,
+          limit: userLimit === -1 ? 'Ilimitado' : userLimit,
+          reachedLimit: hasReachedLimit
+        });
+      }
+    });
+    
+    // Ordenar por número de búsquedas descendente
+    stats.userBreakdown.sort((a, b) => b.searches - a.searches);
+    
+    res.json({
+      success: true,
+      stats,
+      date: today
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
 
 app.listen(PORT, async () => {
   log(`🤖 Bot WhatsApp KYC-LISTAS iniciado en puerto ${PORT}`);
