@@ -46,6 +46,7 @@ const STATES = {
   WAITING_PERSON_TYPE: "waiting_person_type",
   ADVANCED_SEARCH: "advanced_search",
   WAITING_PERCENTAGE: "waiting_percentage",
+  HELP_MENU: "help_menu",
   PROCESSING: "processing",
 };
 
@@ -223,6 +224,7 @@ async function handleWelcome(from, body, session) {
     
   } else if (option === "3") {
     // Menú de ayuda mejorado
+    session.state = STATES.HELP_MENU;
     const helpMessage = enhancedMenus.getHelpMenu();
     await sendWhatsAppMessage(from, helpMessage);
     
@@ -237,6 +239,7 @@ async function handleWelcome(from, body, session) {
     
   } else if (body.toLowerCase() === 'ayuda') {
     // Mostrar ayuda directamente
+    session.state = STATES.HELP_MENU;
     const helpMessage = enhancedMenus.getHelpMenu();
     await sendWhatsAppMessage(from, helpMessage);
     
@@ -538,6 +541,214 @@ Nuevo porcentaje: *${percentage}%*
 ↩️ Escribe *menu* para volver al inicio`);
 }
 
+async function handleHelpMenu(from, body, session) {
+  const option = body.trim();
+  
+  if (option === "0" || body.toLowerCase() === "menu") {
+    // Volver al menú principal
+    session.state = STATES.WELCOME;
+    await handleWelcome(from, 'hola', session);
+    return;
+  }
+  
+  let responseMessage = '';
+  
+  switch(option) {
+    case "1":
+      responseMessage = `📋 *Sobre las Listas de KYC*
+━━━━━━━━━━━━━━━━━━
+
+Nuestro sistema consulta múltiples listas oficiales:
+
+👔 *PEP's* - Personas Expuestas Políticamente
+🇲🇽 *SAT 69-B* - Lista de operaciones inexistentes
+🚫 *LPB* - Lista de Personas Bloqueadas  
+🇺🇸 *OFAC* - Office of Foreign Assets Control
+🌐 *ONU* - Sanciones de Naciones Unidas
+🔍 *INTERPOL* - Base de datos internacional
+🕵️ *FBI* - Most Wanted List
+_Y más listas de compliance..._
+
+━━━━━━━━━━━━━━━━━━
+📊 *Porcentaje recomendado:* 98%
+↩️ Escribe *0* para volver al menú de ayuda`;
+      break;
+      
+    case "2":
+      responseMessage = `🔍 *Cómo Realizar Búsquedas*
+━━━━━━━━━━━━━━━━━━
+
+*Paso a paso:*
+
+1️⃣ Selecciona *"Buscar en Listas"*
+2️⃣ Elige tipo: *Persona Física* o *Empresa*
+3️⃣ Ingresa los datos solicitados
+4️⃣ Confirma la información
+5️⃣ Espera los resultados (pocos segundos)
+6️⃣ Descarga el reporte PDF
+
+💡 *Tips importantes:*
+• Usa nombres completos y exactos
+• Verifica la ortografía antes de confirmar
+• El sistema busca en múltiples listas simultáneamente
+
+━━━━━━━━━━━━━━━━━━
+↩️ Escribe *0* para volver al menú de ayuda`;
+      break;
+      
+    case "3":
+      responseMessage = `📊 *Interpretar Resultados*
+━━━━━━━━━━━━━━━━━━
+
+*Tipos de resultado:*
+
+✅ *SIN COINCIDENCIAS*
+La persona/empresa NO aparece en las listas restrictivas.
+
+⚠️ *CON COINCIDENCIAS*
+Se encontraron registros similares en una o más listas.
+
+*Porcentajes de similitud:*
+• *98-100%* - Coincidencia muy alta (casi exacta)
+• *90-97%* - Coincidencia alta (revisar detalles)  
+• *75-89%* - Coincidencia media (puede ser falso positivo)
+
+💡 *Recomendación:* 98% reduce falsos positivos
+
+━━━━━━━━━━━━━━━━━━
+↩️ Escribe *0* para volver al menú de ayuda`;
+      break;
+      
+    case "4":
+      responseMessage = `💬 *Chat con Soporte*
+━━━━━━━━━━━━━━━━━━
+
+Nuestro equipo de soporte está disponible para ayudarte.
+
+*Horarios de atención:*
+🕐 Lunes a Viernes: 9:00 AM - 6:00 PM
+🕐 Sábados: 10:00 AM - 2:00 PM
+
+*Canales de contacto:*
+📧 Email: hola@kyc-systems.com
+📞 Teléfono: +52 55 4762 6178
+💬 WhatsApp: Este mismo chat
+
+*Tiempo de respuesta:*
+• WhatsApp: Inmediato (horario laboral)
+• Email: Máximo 4 horas
+• Teléfono: Inmediato
+
+━━━━━━━━━━━━━━━━━━
+↩️ Escribe *0* para volver al menú de ayuda`;
+      break;
+      
+    case "5":
+      responseMessage = `📧 *Enviar Email*
+━━━━━━━━━━━━━━━━━━
+
+Para contactarnos por email:
+
+✉️ *Dirección:* hola@kyc-systems.com
+
+*Información a incluir:*
+• Tu nombre y empresa
+• Descripción detallada del problema
+• Capturas de pantalla (si aplica)
+• Número de teléfono registrado
+
+*Tipos de consultas:*
+• Problemas técnicos
+• Preguntas sobre resultados
+• Solicitudes de capacitación
+• Reportes de errores
+
+⏱️ *Tiempo de respuesta:* Máximo 4 horas
+
+━━━━━━━━━━━━━━━━━━
+↩️ Escribe *0* para volver al menú de ayuda`;
+      break;
+      
+    case "6":
+      responseMessage = `📞 *Soporte Telefónico*
+━━━━━━━━━━━━━━━━━━
+
+*Número de soporte:*
++52 55 4762 6178
+
+*Horarios de atención:*
+🕐 Lunes a Viernes: 9:00 AM - 6:00 PM (CDMX)
+🕐 Sábados: 10:00 AM - 2:00 PM (CDMX)
+
+*Antes de llamar, ten a la mano:*
+• Tu nombre y empresa registrada
+• Descripción del problema
+• Número de WhatsApp registrado
+
+*Tipos de soporte:*
+• Asistencia técnica inmediata
+• Explicación de resultados
+• Capacitación en uso del sistema
+
+━━━━━━━━━━━━━━━━━━
+↩️ Escribe *0* para volver al menú de ayuda`;
+      break;
+      
+    case "7":
+    case "8": 
+    case "9":
+      responseMessage = `ℹ️ *Información del Sistema*
+━━━━━━━━━━━━━━━━━━
+
+*Sistema KYC-LISTAS*
+Versión: 2.1.0
+Última actualización: Septiembre 2025
+
+*Características:*
+✅ Consulta en múltiples listas oficiales
+✅ Generación de reportes PDF
+✅ Interface WhatsApp intuitiva
+✅ Porcentajes de coincidencia configurables
+✅ Búsquedas para personas físicas y morales
+
+*Política de Privacidad:*
+• Datos encriptados en tránsito
+• No almacenamos información personal
+• Cumplimiento con GDPR y LFPDPPP
+• Reportes disponibles por 24 horas únicamente
+
+━━━━━━━━━━━━━━━━━━
+↩️ Escribe *0* para volver al menú de ayuda`;
+      break;
+      
+    default:
+      responseMessage = `❌ *Opción no válida en ayuda*
+
+Selecciona una opción del menú de ayuda:
+
+*PREGUNTAS FRECUENTES:*
+1️⃣ 📋 Sobre las Listas
+2️⃣ 🔍 Cómo Buscar  
+3️⃣ 📊 Interpretar Resultados
+
+*SOPORTE TÉCNICO:*
+4️⃣ 💬 Chat con Soporte
+5️⃣ 📧 Enviar Email
+6️⃣ 📞 Llamar
+
+*INFORMACIÓN:*
+7️⃣ 📖 Manual de Usuario
+8️⃣ 🔐 Política de Privacidad
+9️⃣ ℹ️ Versión del Sistema
+
+━━━━━━━━━━━━━━━━━━
+↩️ Escribe *0* para volver al menú de ayuda`;
+      break;
+  }
+  
+  await sendWhatsAppMessage(from, responseMessage);
+}
+
 async function processSearch(from, session) {
   session.state = STATES.PROCESSING;
 
@@ -737,6 +948,10 @@ app.post("/webhook", async (req, res) => {
 
       case STATES.WAITING_PERCENTAGE:
         await handleWaitingPercentage(from, body, session);
+        break;
+
+      case STATES.HELP_MENU:
+        await handleHelpMenu(from, body, session);
         break;
 
       default:
