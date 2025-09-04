@@ -180,26 +180,33 @@ async function searchKYC(searchData) {
 
 // Manejadores de estado
 async function handleWelcome(from, body, session) {
-  // Usar mensaje personalizado mejorado con información del usuario
-  let welcomeMessage;
+  const option = body.trim();
   
-  if (session.user) {
-    // Detectar si es primera vez (no ha hecho búsquedas)
-    const isFirstTime = !session.user.total_queries || session.user.total_queries === 0;
-    welcomeMessage = enhancedMenus.getWelcomeMessage(
-      session.user.full_name, 
-      session.user.company || 'Tu Empresa',
-      isFirstTime
-    );
-  } else {
-    // Mensaje genérico mejorado
-    welcomeMessage = enhancedMenus.getEnhancedMainMenu('Usuario', 'Sistema KYC');
+  // Mensajes de bienvenida que solo muestran el menú sin procesamiento adicional
+  const welcomeKeywords = ['hola', 'hi', 'hello', 'inicio', 'empezar', 'comenzar', ''];
+  
+  if (welcomeKeywords.includes(option.toLowerCase()) || option === '') {
+    // Solo mostrar menú de bienvenida sin procesamiento adicional
+    let welcomeMessage;
+    
+    if (session.user) {
+      // Detectar si es primera vez (no ha hecho búsquedas)
+      const isFirstTime = !session.user.total_queries || session.user.total_queries === 0;
+      welcomeMessage = enhancedMenus.getWelcomeMessage(
+        session.user.full_name, 
+        session.user.company || 'Tu Empresa',
+        isFirstTime
+      );
+    } else {
+      // Mensaje genérico mejorado
+      welcomeMessage = enhancedMenus.getEnhancedMainMenu('Usuario', 'Sistema KYC');
+    }
+
+    await sendWhatsAppMessage(from, welcomeMessage);
+    return; // Importante: salir aquí para no procesar como opción
   }
 
-  await sendWhatsAppMessage(from, welcomeMessage);
-
-  const option = body.trim();
-
+  // Procesar opciones del menú
   if (option === "1") {
     session.state = STATES.WAITING_PERSON_TYPE;
     session.data = {};
@@ -224,21 +231,30 @@ async function handleWelcome(from, body, session) {
     const listsInfo = enhancedMenus.getListsInfo();
     await sendWhatsAppMessage(from, listsInfo);
     
+  } else if (body.toLowerCase() === 'menu') {
+    // Volver a mostrar el menú principal
+    await handleWelcome(from, 'hola', session);
+    
+  } else if (body.toLowerCase() === 'ayuda') {
+    // Mostrar ayuda directamente
+    const helpMessage = enhancedMenus.getHelpMenu();
+    await sendWhatsAppMessage(from, helpMessage);
+    
   } else {
-    // Mensaje para opciones no válidas con menú de ayuda
-    const invalidMessage = `❌ *Opción no válida*
+    // Para opciones realmente inválidas, mostrar un mensaje más amigable
+    const invalidMessage = `🤔 *No entiendo esa opción*
 
-Por favor selecciona una opción del menú:
+Para usar el sistema, selecciona una opción:
 
 1️⃣ 🔎 *Buscar en Listas*
 2️⃣ 📋 *Búsquedas Recientes*  
 3️⃣ ℹ️ *Ayuda y Soporte*
 
 ━━━━━━━━━━━━━━━━━━
-💡 También puedes escribir:
-• *menu* - Ver menú principal
-• *ayuda* - Centro de ayuda
-• *info* - Información de listas`;
+💡 *Comandos útiles:*
+• Escribe *menu* para ver el menú
+• Escribe *ayuda* para obtener ayuda
+• Escribe *info* para ver las listas disponibles`;
 
     await sendWhatsAppMessage(from, invalidMessage);
   }
