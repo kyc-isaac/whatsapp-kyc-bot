@@ -166,6 +166,37 @@ router.delete('/users/:id', async (req, res) => {
   }
 });
 
+// GET - Diagnóstico temporal (ELIMINAR EN PRODUCCIÓN DESPUÉS DE USAR)
+router.get('/diagnostic', async (req, res) => {
+  try {
+    const diagnosticInfo = {
+      kycApiUrl: process.env.KYC_API_URL || 'NO CONFIGURADA',
+      kycApiKeyPresent: !!process.env.KYC_API_KEY,
+      serverUrl: process.env.SERVER_URL || 'NO CONFIGURADA',
+      twilioConfigured: !!(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN),
+      nodeEnv: process.env.NODE_ENV || 'development',
+      timestamp: new Date().toISOString()
+    };
+    
+    // Verificar conectividad con la API KYC
+    try {
+      const axios = require('axios');
+      const testResponse = await axios.get(`${process.env.KYC_API_URL}/health`, {
+        timeout: 5000
+      });
+      diagnosticInfo.kycApiStatus = 'CONECTADO';
+      diagnosticInfo.kycApiHealth = testResponse.data;
+    } catch (error) {
+      diagnosticInfo.kycApiStatus = 'ERROR';
+      diagnosticInfo.kycApiError = error.message;
+    }
+    
+    res.json(diagnosticInfo);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // GET - Estadísticas
 router.get('/stats', async (req, res) => {
   try {
