@@ -243,6 +243,12 @@ async function searchKYC(searchData) {
     
     return response.data;
   } catch (error) {
+    // La API KYC devuelve 404 cuando no hay coincidencias, pero incluye datos válidos
+    if (error.response && error.response.status === 404 && error.response.data) {
+      log(`Búsqueda KYC completada: Sin coincidencias (404 con datos)`);
+      return error.response.data; // Devolver los datos aunque sea 404
+    }
+    
     log(
       `Error en búsqueda KYC: ${
         error.response?.data?.message || error.message
