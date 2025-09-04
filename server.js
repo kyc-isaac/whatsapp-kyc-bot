@@ -218,6 +218,8 @@ function convertBase64ToFile(base64Data, fileName) {
 async function searchKYC(searchData) {
   try {
     log(`Búsqueda KYC iniciada: ${JSON.stringify(searchData)}`);
+    log(`API URL: ${KYC_API_URL}/search`);
+    log(`API Key presente: ${KYC_API_KEY ? 'Sí' : 'No'}`);
 
     const response = await axios.post(
       `${KYC_API_URL}/search`,
@@ -247,6 +249,17 @@ async function searchKYC(searchData) {
       }`,
       "ERROR"
     );
+    
+    // Log adicional para debugging
+    if (error.response) {
+      log(`Status Code: ${error.response.status}`, "ERROR");
+      log(`Response Data: ${JSON.stringify(error.response.data)}`, "ERROR");
+    } else if (error.request) {
+      log(`No se recibió respuesta de la API`, "ERROR");
+    } else {
+      log(`Error de configuración: ${error.message}`, "ERROR");
+    }
+    
     return {
       err: true,
       message: error.response?.data?.message || "Error interno en la búsqueda",
@@ -464,9 +477,11 @@ El nombre debe tener al menos *2 caracteres*.
 
   if (session.data.persona === "2" && session.data.isFullNamePerson) {
     // Para persona física con nombre completo (se envía como persona moral)
+    log(`Procesando búsqueda de persona física con nombre completo: ${name}`);
     await processSearch(from, session);
   } else if (session.data.persona === "2") {
     // Para persona moral, procesar directamente
+    log(`Procesando búsqueda de persona moral: ${name}`);
     await processSearch(from, session);
   } else {
     // Para persona física con apellidos separados, pedir apellido paterno
