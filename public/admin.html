@@ -227,6 +227,87 @@
             margin-bottom: 20px;
         }
 
+        .tabs {
+            display: flex;
+            border-bottom: 2px solid #e2e8f0;
+            margin-bottom: 20px;
+        }
+
+        .tab-btn {
+            padding: 15px 25px;
+            border: none;
+            background: transparent;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            color: #666;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s;
+        }
+
+        .tab-btn.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+            background: rgba(102, 126, 234, 0.1);
+        }
+
+        .tab-btn:hover {
+            background: rgba(102, 126, 234, 0.05);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .limit-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .limit-unlimited {
+            background: #c6f6d5;
+            color: #22543d;
+        }
+
+        .limit-standard {
+            background: #bee3f8;
+            color: #2a69ac;
+        }
+
+        .limit-limited {
+            background: #fed7d7;
+            color: #742a2a;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e2e8f0;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: #667eea;
+            transition: width 0.3s;
+        }
+
+        .progress-fill.warning {
+            background: #ed8936;
+        }
+
+        .progress-fill.danger {
+            background: #f56565;
+        }
+
         @media (max-width: 768px) {
             .toolbar {
                 flex-direction: column;
@@ -271,18 +352,59 @@
         </div>
 
         <div class="main-panel">
-            <div class="toolbar">
-                <div>
-                    <button class="btn btn-primary" onclick="showAddModal()">➕ Agregar Usuario</button>
-                    <button class="btn btn-success" onclick="loadUsers()">🔄 Actualizar</button>
-                </div>
-                <input type="text" class="search-box" id="searchBox" placeholder="Buscar por nombre o teléfono..." onkeyup="filterUsers()">
+            <!-- Tabs -->
+            <div class="tabs">
+                <button class="tab-btn active" onclick="showTab('users')">👥 Usuarios</button>
+                <button class="tab-btn" onclick="showTab('limits')">🔢 Límites de Búsqueda</button>
+                <button class="tab-btn" onclick="showTab('stats')">📊 Estadísticas</button>
             </div>
 
-            <div id="message"></div>
+            <!-- Tab: Usuarios -->
+            <div id="usersTab" class="tab-content active">
+                <div class="toolbar">
+                    <div>
+                        <button class="btn btn-primary" onclick="showAddModal()">➕ Agregar Usuario</button>
+                        <button class="btn btn-success" onclick="loadUsers()">🔄 Actualizar</button>
+                    </div>
+                    <input type="text" class="search-box" id="searchBox" placeholder="Buscar por nombre o teléfono..." onkeyup="filterUsers()">
+                </div>
 
-            <div id="content">
-                <div class="loading">Cargando usuarios...</div>
+                <div id="message"></div>
+
+                <div id="content">
+                    <div class="loading">Cargando usuarios...</div>
+                </div>
+            </div>
+
+            <!-- Tab: Límites de Búsqueda -->
+            <div id="limitsTab" class="tab-content">
+                <div class="toolbar">
+                    <div>
+                        <button class="btn btn-success" onclick="loadSearchLimits()">🔄 Actualizar Límites</button>
+                    </div>
+                    <input type="text" class="search-box" id="limitsSearchBox" placeholder="Buscar usuario..." onkeyup="filterSearchLimits()">
+                </div>
+
+                <div id="limitsMessage"></div>
+
+                <div id="limitsContent">
+                    <div class="loading">Cargando límites de búsqueda...</div>
+                </div>
+            </div>
+
+            <!-- Tab: Estadísticas -->
+            <div id="statsTab" class="tab-content">
+                <div class="toolbar">
+                    <div>
+                        <button class="btn btn-success" onclick="loadSearchStats()">🔄 Actualizar Estadísticas</button>
+                    </div>
+                </div>
+
+                <div id="statsMessage"></div>
+
+                <div id="statsContent">
+                    <div class="loading">Cargando estadísticas...</div>
+                </div>
             </div>
         </div>
     </div>
@@ -315,6 +437,42 @@
                 <div class="modal-buttons">
                     <button type="button" class="btn btn-danger" onclick="closeModal()">Cancelar</button>
                     <button type="submit" class="btn btn-primary">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal para configurar límites -->
+    <div class="modal" id="limitModal">
+        <div class="modal-content">
+            <h2 id="limitModalTitle">Configurar Límite de Búsquedas</h2>
+            <form id="limitForm">
+                <div class="form-group">
+                    <label>Usuario:</label>
+                    <input type="text" id="limitUserPhone" readonly style="background: #f5f5f5;">
+                </div>
+                <div class="form-group">
+                    <label>Límite Diario:</label>
+                    <select id="limitType" onchange="toggleCustomLimit()">
+                        <option value="unlimited">Ilimitado</option>
+                        <option value="100">Estándar (100 búsquedas)</option>
+                        <option value="10">Limitado (10 búsquedas)</option>
+                        <option value="custom">Personalizado</option>
+                    </select>
+                </div>
+                <div class="form-group" id="customLimitGroup" style="display: none;">
+                    <label>Límite personalizado:</label>
+                    <input type="number" id="customLimit" min="1" max="10000" placeholder="Ej: 50">
+                </div>
+                <div class="form-group">
+                    <small style="color: #666;">
+                        📊 <strong>Búsquedas hoy:</strong> <span id="currentSearches">-</span><br>
+                        🕒 <strong>Resetea:</strong> Diariamente a medianoche
+                    </small>
+                </div>
+                <div class="modal-buttons">
+                    <button type="button" class="btn btn-danger" onclick="closeLimitModal()">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar Límite</button>
                 </div>
             </form>
         </div>
@@ -516,6 +674,314 @@
 
         function showMessage(text, type) {
             const messageDiv = document.getElementById('message');
+            messageDiv.className = type;
+            messageDiv.textContent = text;
+            messageDiv.style.display = 'block';
+            
+            setTimeout(() => {
+                messageDiv.style.display = 'none';
+            }, 3000);
+        }
+
+        // ===== FUNCIONES DE PESTAÑAS =====
+        function showTab(tabName) {
+            // Ocultar todas las pestañas
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Quitar clase active de todos los botones
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            // Mostrar pestaña activa
+            document.getElementById(tabName + 'Tab').classList.add('active');
+            event.target.classList.add('active');
+            
+            // Cargar contenido según la pestaña
+            if (tabName === 'limits') {
+                loadSearchLimits();
+            } else if (tabName === 'stats') {
+                loadSearchStats();
+            }
+        }
+
+        // ===== FUNCIONES DE LÍMITES DE BÚSQUEDA =====
+        let searchLimits = [];
+
+        async function loadSearchLimits() {
+            try {
+                const response = await fetch(`${API_BASE}/user-limits`);
+                if (!response.ok) throw new Error('Error al cargar límites');
+                
+                const data = await response.json();
+                searchLimits = data.users || [];
+                renderSearchLimits(searchLimits);
+                showLimitsMessage('Límites cargados exitosamente', 'success');
+            } catch (error) {
+                console.error('Error:', error);
+                showLimitsMessage('Error al cargar límites de búsqueda', 'error');
+            }
+        }
+
+        function renderSearchLimits(limitsToRender) {
+            const content = document.getElementById('limitsContent');
+            
+            if (limitsToRender.length === 0) {
+                content.innerHTML = '<div class="loading">No hay usuarios con límites configurados</div>';
+                return;
+            }
+
+            let html = `
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Usuario</th>
+                            <th>Límite Diario</th>
+                            <th>Búsquedas Hoy</th>
+                            <th>Progreso</th>
+                            <th>Estado</th>
+                            <th>Última Actividad</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            limitsToRender.forEach(user => {
+                const isUnlimited = user.dailyLimit === 'Ilimitado';
+                const limitClass = isUnlimited ? 'limit-unlimited' : 
+                                 user.dailyLimit >= 100 ? 'limit-standard' : 'limit-limited';
+                
+                let progressHtml = '-';
+                let statusHtml = user.isActive ? 
+                    '<span class="status-active">Activo</span>' : 
+                    '<span class="status-inactive">Inactivo</span>';
+
+                if (!isUnlimited) {
+                    const percentage = Math.min((user.todaySearches / user.dailyLimit) * 100, 100);
+                    const progressClass = percentage >= 90 ? 'danger' : percentage >= 70 ? 'warning' : '';
+                    
+                    progressHtml = `
+                        <div class="progress-bar">
+                            <div class="progress-fill ${progressClass}" style="width: ${percentage}%"></div>
+                        </div>
+                        <small>${user.todaySearches}/${user.dailyLimit}</small>
+                    `;
+                }
+                
+                const lastActivity = user.lastActivity ? 
+                    new Date(user.lastActivity).toLocaleString() : 'Nunca';
+                
+                html += `
+                    <tr>
+                        <td>
+                            <strong>${user.phoneNumber}</strong>
+                        </td>
+                        <td>
+                            <span class="limit-badge ${limitClass}">
+                                ${user.dailyLimit}
+                            </span>
+                        </td>
+                        <td>${user.todaySearches}</td>
+                        <td>${progressHtml}</td>
+                        <td>${statusHtml}</td>
+                        <td>${lastActivity}</td>
+                        <td>
+                            <button class="btn btn-warning" onclick="showLimitModal('${user.phoneNumber}', ${user.dailyLimit === 'Ilimitado' ? -1 : user.dailyLimit}, ${user.todaySearches})">
+                                🔢 Límite
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            html += '</tbody></table>';
+            content.innerHTML = html;
+        }
+
+        function filterSearchLimits() {
+            const search = document.getElementById('limitsSearchBox').value.toLowerCase();
+            const filtered = searchLimits.filter(user => 
+                user.phoneNumber.toLowerCase().includes(search)
+            );
+            renderSearchLimits(filtered);
+        }
+
+        function showLimitModal(phoneNumber, currentLimit, todaySearches) {
+            document.getElementById('limitUserPhone').value = phoneNumber;
+            document.getElementById('currentSearches').textContent = todaySearches;
+            
+            // Configurar el select basado en el límite actual
+            const limitType = document.getElementById('limitType');
+            if (currentLimit === -1) {
+                limitType.value = 'unlimited';
+            } else if (currentLimit === 100) {
+                limitType.value = '100';
+            } else if (currentLimit === 10) {
+                limitType.value = '10';
+            } else {
+                limitType.value = 'custom';
+                document.getElementById('customLimit').value = currentLimit;
+                document.getElementById('customLimitGroup').style.display = 'block';
+            }
+            
+            document.getElementById('limitModal').classList.add('active');
+        }
+
+        function closeLimitModal() {
+            document.getElementById('limitModal').classList.remove('active');
+        }
+
+        function toggleCustomLimit() {
+            const limitType = document.getElementById('limitType').value;
+            const customGroup = document.getElementById('customLimitGroup');
+            
+            if (limitType === 'custom') {
+                customGroup.style.display = 'block';
+            } else {
+                customGroup.style.display = 'none';
+            }
+        }
+
+        // Manejar envío de formulario de límites
+        document.getElementById('limitForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const phoneNumber = document.getElementById('limitUserPhone').value;
+            const limitType = document.getElementById('limitType').value;
+            
+            let finalLimit;
+            if (limitType === 'unlimited') {
+                finalLimit = 'unlimited';
+            } else if (limitType === 'custom') {
+                finalLimit = parseInt(document.getElementById('customLimit').value);
+                if (!finalLimit || finalLimit < 1) {
+                    showLimitsMessage('Ingrese un límite válido mayor a 0', 'error');
+                    return;
+                }
+            } else {
+                finalLimit = parseInt(limitType);
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/set-user-limit`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        phoneNumber: phoneNumber,
+                        limit: finalLimit
+                    })
+                });
+
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showLimitsMessage(result.message || 'Límite actualizado exitosamente', 'success');
+                    closeLimitModal();
+                    loadSearchLimits();
+                } else {
+                    showLimitsMessage(result.error || 'Error al actualizar límite', 'error');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showLimitsMessage('Error al procesar la solicitud', 'error');
+            }
+        });
+
+        function showLimitsMessage(text, type) {
+            const messageDiv = document.getElementById('limitsMessage');
+            messageDiv.className = type;
+            messageDiv.textContent = text;
+            messageDiv.style.display = 'block';
+            
+            setTimeout(() => {
+                messageDiv.style.display = 'none';
+            }, 3000);
+        }
+
+        // ===== FUNCIONES DE ESTADÍSTICAS =====
+        async function loadSearchStats() {
+            try {
+                const response = await fetch(`${API_BASE}/search-stats`);
+                if (!response.ok) throw new Error('Error al cargar estadísticas');
+                
+                const data = await response.json();
+                renderSearchStats(data);
+                showStatsMessage('Estadísticas cargadas exitosamente', 'success');
+            } catch (error) {
+                console.error('Error:', error);
+                showStatsMessage('Error al cargar estadísticas', 'error');
+            }
+        }
+
+        function renderSearchStats(data) {
+            const content = document.getElementById('statsContent');
+            
+            const stats = data.stats;
+            
+            let html = `
+                <div class="stats" style="margin-bottom: 30px;">
+                    <div class="stat-card">
+                        <div class="stat-value">${stats.totalUsersToday}</div>
+                        <div class="stat-label">Usuarios Activos Hoy</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">${stats.totalSearchesToday}</div>
+                        <div class="stat-label">Búsquedas Hoy</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">${stats.activeUsers}</div>
+                        <div class="stat-label">Sesiones Activas</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">${stats.limitReachedUsers}</div>
+                        <div class="stat-label">Límites Alcanzados</div>
+                    </div>
+                </div>
+                
+                <h3 style="margin-bottom: 20px;">📊 Desglose de Usuarios - ${data.date}</h3>
+            `;
+
+            if (stats.userBreakdown.length === 0) {
+                html += '<div class="loading">No hay datos de búsquedas para hoy</div>';
+            } else {
+                html += `
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Usuario</th>
+                                <th>Búsquedas</th>
+                                <th>Límite</th>
+                                <th>Estado</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                `;
+
+                stats.userBreakdown.forEach(user => {
+                    const statusClass = user.reachedLimit ? 'status-inactive' : 'status-active';
+                    const statusText = user.reachedLimit ? 'Límite Alcanzado' : 'Activo';
+                    
+                    html += `
+                        <tr>
+                            <td>${user.user}</td>
+                            <td>${user.searches}</td>
+                            <td>${user.limit}</td>
+                            <td><span class="${statusClass}">${statusText}</span></td>
+                        </tr>
+                    `;
+                });
+
+                html += '</tbody></table>';
+            }
+            
+            content.innerHTML = html;
+        }
+
+        function showStatsMessage(text, type) {
+            const messageDiv = document.getElementById('statsMessage');
             messageDiv.className = type;
             messageDiv.textContent = text;
             messageDiv.style.display = 'block';
