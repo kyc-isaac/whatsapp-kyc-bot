@@ -181,14 +181,27 @@ router.get('/diagnostic', async (req, res) => {
     // Verificar conectividad con la API KYC
     try {
       const axios = require('axios');
-      const testResponse = await axios.get(`${process.env.KYC_API_URL}/health`, {
+      // Hacer una búsqueda de prueba simple para verificar la conectividad
+      const testResponse = await axios.post(`${process.env.KYC_API_URL}/search`, {
+        persona: "2",
+        nombre: "TEST CONNECTION",
+        porcentaje_min: 98
+      }, {
+        headers: {
+          "Content-Type": "application/json",
+          "X-API-Key": process.env.KYC_API_KEY,
+        },
         timeout: 5000
       });
       diagnosticInfo.kycApiStatus = 'CONECTADO';
-      diagnosticInfo.kycApiHealth = testResponse.data;
+      diagnosticInfo.kycApiResponse = 'API funcional';
     } catch (error) {
       diagnosticInfo.kycApiStatus = 'ERROR';
       diagnosticInfo.kycApiError = error.message;
+      if (error.response) {
+        diagnosticInfo.kycApiStatusCode = error.response.status;
+        diagnosticInfo.kycApiResponseData = error.response.data;
+      }
     }
     
     res.json(diagnosticInfo);
