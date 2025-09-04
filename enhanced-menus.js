@@ -265,10 +265,10 @@ function getHelpMenu() {
       _Agente en línea_
 
 5️⃣ 📧 *Enviar Email*
-      _soporte@kyc-listas.com_
+      _hola@kyc-systems.com_
 
 6️⃣ 📞 *Llamar*
-      _+52 55 1234 5678_
+      _+52 55 4762 6178_
 
 *INFORMACIÓN*
 
