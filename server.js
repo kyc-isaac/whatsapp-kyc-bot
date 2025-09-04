@@ -9,6 +9,9 @@ const path = require("path");
 const { testConnection } = require("./database");
 const authService = require("./authService");
 
+// Módulo de menús mejorados
+const enhancedMenus = require("./enhanced-menus");
+
 const app = express();
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
@@ -41,6 +44,8 @@ const STATES = {
   WAITING_APATERNO: "waiting_apaterno",
   WAITING_AMATERNO: "waiting_amaterno",
   WAITING_PERSON_TYPE: "waiting_person_type",
+  ADVANCED_SEARCH: "advanced_search",
+  WAITING_PERCENTAGE: "waiting_percentage",
   PROCESSING: "processing",
 };
 
@@ -175,23 +180,20 @@ async function searchKYC(searchData) {
 
 // Manejadores de estado
 async function handleWelcome(from, body, session) {
-  // Usar mensaje personalizado si hay información del usuario
+  // Usar mensaje personalizado mejorado con información del usuario
   let welcomeMessage;
   
   if (session.user) {
-    welcomeMessage = authService.getWelcomeMessage(session.user);
+    // Detectar si es primera vez (no ha hecho búsquedas)
+    const isFirstTime = !session.user.total_queries || session.user.total_queries === 0;
+    welcomeMessage = enhancedMenus.getWelcomeMessage(
+      session.user.full_name, 
+      session.user.company || 'Tu Empresa',
+      isFirstTime
+    );
   } else {
-    // Mensaje genérico (no debería llegar aquí si la autorización funciona)
-    welcomeMessage = `¡Hola! 👋 *Bienvenido al Bot KYC-LISTAS*
-
-🔍 *Sistema de Consulta de Listas Restrictivas*
-
-Selecciona una opción:
-*1* - 🔎 Búsqueda en listas
-*2* - ℹ️ Información del sistema  
-*3* - 📞 Contacto soporte
-
-Escribe el número de la opción que deseas.`;
+    // Mensaje genérico mejorado
+    welcomeMessage = enhancedMenus.getEnhancedMainMenu('Usuario', 'Sistema KYC');
   }
 
   await sendWhatsAppMessage(from, welcomeMessage);
@@ -202,56 +204,43 @@ Escribe el número de la opción que deseas.`;
     session.state = STATES.WAITING_PERSON_TYPE;
     session.data = {};
 
-    const personTypeMessage = `🔍 *Búsqueda en Listas Restrictivas*
-
-Selecciona el tipo de persona:
-*1* - 👤 Persona Física (Individual)
-*2* - 🏢 Persona Moral (Empresa)
-
-Escribe *1* o *2*:`;
-
-    await sendWhatsAppMessage(from, personTypeMessage);
+    // Usar menú de tipo de búsqueda mejorado
+    const searchTypeMessage = enhancedMenus.getSearchTypeMenu();
+    await sendWhatsAppMessage(from, searchTypeMessage);
+    
   } else if (option === "2") {
-    const infoMessage = `ℹ️ *Información del Sistema KYC-LISTAS*
-
-✅ *Listas consultadas:*
-• OFAC (Office of Foreign Assets Control)
-• DEA (Drug Enforcement Administration)  
-• SAT (Sistema de Administración Tributaria)
-• PEP (Personas Expuestas Políticamente)
-• FBI (Federal Bureau of Investigation)
-• LPB (Listas Personas Bloqueadas)
-
-🎯 *Características:*
-• Búsqueda por similitud avanzada
-• Generación automática de reportes PDF
-• Procesamiento en tiempo real
-• Algoritmo de coincidencias inteligente
-
-📊 *Precisión:* >95%
-⚡ *Tiempo promedio:* <100ms
-
-Para realizar una búsqueda, escribe *1*.`;
-
-    await sendWhatsAppMessage(from, infoMessage);
+    // Mostrar búsquedas recientes (placeholder por ahora)
+    const recentSearches = []; // TODO: Implementar historial real
+    const recentMessage = enhancedMenus.getRecentSearches(recentSearches);
+    await sendWhatsAppMessage(from, recentMessage);
+    
   } else if (option === "3") {
-    const contactMessage = `📞 *Soporte Técnico KYC-LISTAS*
+    // Menú de ayuda mejorado
+    const helpMessage = enhancedMenus.getHelpMenu();
+    await sendWhatsAppMessage(from, helpMessage);
+    
+  } else if (body.toLowerCase().includes('info') || body.toLowerCase().includes('listas')) {
+    // Información detallada de las listas
+    const listsInfo = enhancedMenus.getListsInfo();
+    await sendWhatsAppMessage(from, listsInfo);
+    
+  } else {
+    // Mensaje para opciones no válidas con menú de ayuda
+    const invalidMessage = `❌ *Opción no válida*
 
-📧 *Email:* soporte@kyc-listas.com
-📱 *WhatsApp:* +52 55 1234-5678
-🌐 *Web:* www.kyc-listas.com
+Por favor selecciona una opción del menú:
 
-*Horario de atención:*
-🕘 Lunes a Viernes: 9:00 AM - 6:00 PM
-🕘 Sábados: 9:00 AM - 2:00 PM
+1️⃣ 🔎 *Buscar en Listas*
+2️⃣ 📋 *Búsquedas Recientes*  
+3️⃣ ℹ️ *Ayuda y Soporte*
 
-*Tiempo de respuesta:*
-• Email: 24 horas
-• WhatsApp: Inmediato en horario laboral
+━━━━━━━━━━━━━━━━━━
+💡 También puedes escribir:
+• *menu* - Ver menú principal
+• *ayuda* - Centro de ayuda
+• *info* - Información de listas`;
 
-Para volver al menú, escribe *menu*.`;
-
-    await sendWhatsAppMessage(from, contactMessage);
+    await sendWhatsAppMessage(from, invalidMessage);
   }
 }
 
@@ -260,38 +249,68 @@ async function handlePersonType(from, body, session) {
 
   if (option === "1" || option === "2") {
     session.data.persona = option;
+    session.data.porcentaje_min = 98; // Establecer porcentaje por defecto
     session.state = STATES.WAITING_NAME;
 
     const nameMessage =
       option === "1"
         ? `👤 *Persona Física Seleccionada*
+━━━━━━━━━━━━━━━━━━
 
 📝 Escribe el *nombre(s)* de la persona:
 
 *Ejemplo:* JUAN CARLOS
-*Nota:* Solo el nombre, después te pediré los apellidos por separado.
+💡 *Nota:* Solo el nombre, después te pediré los apellidos por separado.
 
-Para cancelar, escribe *menu*.`
+━━━━━━━━━━━━━━━━━━
+↩️ Para cancelar, escribe *menu*`
         : `🏢 *Persona Moral Seleccionada*
+━━━━━━━━━━━━━━━━━━
 
 📝 Escribe la *razón social completa* de la empresa:
 
 *Ejemplo:* CONSTRUCTORA EJEMPLO SA DE CV
 
-Para cancelar, escribe *menu*.`;
+━━━━━━━━━━━━━━━━━━
+↩️ Para cancelar, escribe *menu*`;
 
     await sendWhatsAppMessage(from, nameMessage);
+    
+  } else if (option === "4") {
+    // Opción de búsqueda avanzada
+    session.state = STATES.ADVANCED_SEARCH;
+    await sendWhatsAppMessage(from, `⚙️ *Búsqueda Avanzada*
+━━━━━━━━━━━━━━━━━━
+
+Selecciona el tipo de configuración:
+
+1️⃣ 👤 *Persona Física* (con opciones avanzadas)
+2️⃣ 🏢 *Empresa* (con opciones avanzadas)
+3️⃣ 📊 *Configurar Porcentaje de Coincidencia*
+      _Actual: 98% (recomendado)_
+
+━━━━━━━━━━━━━━━━━━
+💡 *Nota:* 98% reduce falsos positivos
+↩️ Escribe *menu* para volver`);
+    return;
+  
   } else if (body.toLowerCase() === "menu") {
     session.state = STATES.WELCOME;
     await handleWelcome(from, "", session);
   } else {
     await sendWhatsAppMessage(
       from,
-      `❌ Opción inválida. Por favor escribe:
+      `❌ *Opción Inválida*
+━━━━━━━━━━━━━━━━━━
 
-*1* - Para Persona Física
-*2* - Para Persona Moral  
-*menu* - Para volver al inicio`
+Por favor selecciona una opción válida:
+
+1️⃣ *Persona Física*
+2️⃣ *Persona Moral*
+4️⃣ *Búsqueda Avanzada*
+
+━━━━━━━━━━━━━━━━━━
+↩️ Escribe *menu* para volver al inicio`
     );
   }
 }
@@ -307,10 +326,15 @@ async function handleName(from, body, session) {
   if (name.length < 2) {
     await sendWhatsAppMessage(
       from,
-      `❌ El nombre debe tener al menos 2 caracteres. 
+      `❌ *Nombre Inválido*
+━━━━━━━━━━━━━━━━━━
 
-Por favor intenta nuevamente:
-Para cancelar, escribe *menu*.`
+El nombre debe tener al menos *2 caracteres*.
+
+🔄 Por favor intenta nuevamente
+
+━━━━━━━━━━━━━━━━━━
+↩️ Para cancelar, escribe *menu*`
     );
     return;
   }
@@ -325,12 +349,16 @@ Para cancelar, escribe *menu*.`
     session.state = STATES.WAITING_APATERNO;
     await sendWhatsAppMessage(
       from,
-      `📝 Perfecto. Ahora escribe el *apellido paterno*:
+      `📝 *Apellido Paterno*
+━━━━━━━━━━━━━━━━━━
+
+Escribe el *apellido paterno*:
 
 *Ejemplo:* GARCIA
 
-Si no tiene apellido paterno o deseas omitirlo, escribe *skip*.
-Para cancelar, escribe *menu*.`
+━━━━━━━━━━━━━━━━━━
+💡 Si no tiene apellido paterno, escribe *skip*
+↩️ Para cancelar, escribe *menu*`
     );
   }
 }
@@ -349,12 +377,16 @@ async function handleApaterno(from, body, session) {
   session.state = STATES.WAITING_AMATERNO;
   await sendWhatsAppMessage(
     from,
-    `📝 Finalmente, escribe el *apellido materno*:
+    `📝 *Apellido Materno*
+━━━━━━━━━━━━━━━━━━
+
+Finalmente, escribe el *apellido materno*:
 
 *Ejemplo:* LOPEZ
 
-Si no tiene apellido materno o deseas omitirlo, escribe *skip*.
-Para cancelar, escribe *menu*.`
+━━━━━━━━━━━━━━━━━━
+💡 Si no tiene apellido materno, escribe *skip*
+↩️ Para cancelar, escribe *menu*`
   );
 }
 
@@ -372,96 +404,183 @@ async function handleAmaterno(from, body, session) {
   await processSearch(from, session);
 }
 
+async function handleAdvancedSearch(from, body, session) {
+  const option = body.trim();
+  
+  if (option === "1" || option === "2") {
+    // Persona física o moral con opciones avanzadas
+    session.data.persona = option;
+    session.data.porcentaje_min = session.data.porcentaje_min || 98;
+    session.state = STATES.WAITING_NAME;
+    
+    const nameMessage = option === "1"
+      ? `👤 *Persona Física - Búsqueda Avanzada*
+━━━━━━━━━━━━━━━━━━
+
+📝 Escribe el *nombre(s)* de la persona:
+
+*Ejemplo:* JUAN CARLOS
+💡 *Nota:* Solo el nombre, después te pediré los apellidos
+
+*Configuración actual:*
+• 📊 Porcentaje: *${session.data.porcentaje_min || 98}%*
+
+━━━━━━━━━━━━━━━━━━
+↩️ Para cancelar, escribe *menu*`
+      : `🏢 *Empresa - Búsqueda Avanzada*  
+━━━━━━━━━━━━━━━━━━
+
+📝 Escribe la *razón social completa*:
+
+*Ejemplo:* CONSTRUCTORA EJEMPLO SA DE CV
+
+*Configuración actual:*
+• 📊 Porcentaje: *${session.data.porcentaje_min || 98}%*
+
+━━━━━━━━━━━━━━━━━━
+↩️ Para cancelar, escribe *menu*`;
+    
+    await sendWhatsAppMessage(from, nameMessage);
+    
+  } else if (option === "3") {
+    // Configurar porcentaje
+    session.state = STATES.WAITING_PERCENTAGE;
+    await sendWhatsAppMessage(from, `📊 *Configurar Porcentaje de Coincidencia*
+━━━━━━━━━━━━━━━━━━
+
+*Porcentaje actual:* ${session.data.porcentaje_min || 98}%
+
+Escribe el nuevo porcentaje (entre 50% y 99%):
+
+*Recomendaciones:*
+• 📈 *98%* - Recomendado (menos falsos positivos)
+• 📊 *90%* - Balanceado
+• 📉 *75%* - Más permisivo (más coincidencias)
+
+━━━━━━━━━━━━━━━━━━
+💡 *Nota:* Mayor porcentaje = Mayor precisión
+↩️ Escribe *menu* para cancelar`);
+    
+  } else if (body.toLowerCase() === "menu") {
+    session.state = STATES.WELCOME;
+    await handleWelcome(from, "", session);
+  } else {
+    await sendWhatsAppMessage(from, `❌ *Opción Inválida*
+━━━━━━━━━━━━━━━━━━
+
+Selecciona una opción válida:
+
+1️⃣ *Persona Física*
+2️⃣ *Empresa* 
+3️⃣ *Configurar Porcentaje*
+
+━━━━━━━━━━━━━━━━━━
+↩️ Escribe *menu* para volver`);
+  }
+}
+
+async function handleWaitingPercentage(from, body, session) {
+  if (body.toLowerCase() === "menu") {
+    session.state = STATES.WELCOME;
+    await handleWelcome(from, "", session);
+    return;
+  }
+
+  const percentage = parseInt(body.replace('%', ''));
+  
+  if (isNaN(percentage) || percentage < 50 || percentage > 99) {
+    await sendWhatsAppMessage(from, `❌ *Porcentaje Inválido*
+━━━━━━━━━━━━━━━━━━
+
+Debe ser un número entre 50 y 99.
+
+*Ejemplos válidos:*
+• 98
+• 90
+• 75
+
+━━━━━━━━━━━━━━━━━━
+🔄 Intenta nuevamente o escribe *menu* para cancelar`);
+    return;
+  }
+
+  session.data.porcentaje_min = percentage;
+  session.state = STATES.ADVANCED_SEARCH;
+  
+  await sendWhatsAppMessage(from, `✅ *Porcentaje Configurado*
+━━━━━━━━━━━━━━━━━━
+
+Nuevo porcentaje: *${percentage}%*
+
+⚙️ *Búsqueda Avanzada*
+
+1️⃣ 👤 *Persona Física* 
+2️⃣ 🏢 *Empresa*
+3️⃣ 📊 *Cambiar Porcentaje* _(${percentage}%)_
+
+━━━━━━━━━━━━━━━━━━
+↩️ Escribe *menu* para volver al inicio`);
+}
+
 async function processSearch(from, session) {
   session.state = STATES.PROCESSING;
 
-  // Mostrar resumen de datos que se van a buscar
-  let searchSummary = `🔍 *Iniciando búsqueda...*
-
-*Datos a consultar:*
-👤 Tipo: ${session.data.persona === "1" ? "Persona Física" : "Persona Moral"}
-📝 Nombre: ${session.data.nombre}`;
-
-  if (session.data.apaterno)
-    searchSummary += `\n📝 Apellido Paterno: ${session.data.apaterno}`;
-  if (session.data.amaterno)
-    searchSummary += `\n📝 Apellido Materno: ${session.data.amaterno}`;
-
-  searchSummary += `\n\n⏳ *Procesando...* 
-Consultando listas OFAC, DEA, SAT, PEP, FBI...
-
-Esto puede tomar unos segundos.`;
-
-  await sendWhatsAppMessage(from, searchSummary);
-
+  // Mostrar confirmación con el formato mejorado
   const searchData = {
+    tipo: session.data.persona === "1" ? "persona" : "empresa",
+    nombre: session.data.nombre,
+    apellidoPaterno: session.data.apaterno,
+    apellidoMaterno: session.data.amaterno,
+    porcentaje_min: session.data.porcentaje_min || 98
+  };
+  
+  const confirmationMessage = enhancedMenus.getConfirmationMessage(searchData);
+  await sendWhatsAppMessage(from, confirmationMessage);
+  
+  // Esperar un momento antes de procesar
+  await new Promise(resolve => setTimeout(resolve, 2000));
+  
+  // Mostrar estado de procesamiento
+  const processingMessage = enhancedMenus.getProcessingStatus(1);
+  await sendWhatsAppMessage(from, processingMessage);
+
+  const kycSearchData = {
     persona: session.data.persona,
     nombre: session.data.nombre,
-    porcentaje_min: 85,
+    porcentaje_min: session.data.porcentaje_min || 98,
   };
 
-  if (session.data.apaterno) searchData.apaterno = session.data.apaterno;
-  if (session.data.amaterno) searchData.amaterno = session.data.amaterno;
+  if (session.data.apaterno) kycSearchData.apaterno = session.data.apaterno;
+  if (session.data.amaterno) kycSearchData.amaterno = session.data.amaterno;
 
-  const result = await searchKYC(searchData);
+  const result = await searchKYC(kycSearchData);
   await handleSearchResult(from, session, result);
 }
 
 async function handleSearchResult(from, session, result) {
   if (result.err) {
-    await sendWhatsAppMessage(
-      from,
-      `❌ *Error en la búsqueda:*
-
-${result.message}
-
-Para realizar una nueva búsqueda, escribe *1*.
-Para volver al menú, escribe *menu*.`
-    );
+    // Usar mensaje de error mejorado
+    const errorMessage = enhancedMenus.getErrorMessage('api_error');
+    await sendWhatsAppMessage(from, errorMessage);
 
     session.state = STATES.WELCOME;
     session.data = {};
     return;
   }
 
-  let responseMessage = `✅ *Búsqueda Completada*
-
-👤 *Consultado:* ${session.data.nombre}`;
-
-  if (session.data.apaterno) responseMessage += ` ${session.data.apaterno}`;
-  if (session.data.amaterno) responseMessage += ` ${session.data.amaterno}`;
-
-  responseMessage += `\n⏱️ *Tiempo:* ${result.performance?.processing_time_ms}ms\n`;
-
-  if (result.coincidences > 0) {
-    responseMessage += `\n🚨 *${result.coincidences} COINCIDENCIA(S) ENCONTRADA(S)*
-
-⚠️ *ATENCIÓN: La persona consultada APARECE en listas restrictivas*\n`;
-
-    result.person.slice(0, 3).forEach((match, index) => {
-      responseMessage += `\n*${index + 1}. ${match.nombre}*`;
-      responseMessage += `\n   📊 Similitud: *${match.porcentaje_coincidencia}%*`;
-      responseMessage += `\n   📋 Lista: *${match.tipo}*`;
-      responseMessage += `\n   📍 Estado: ${match.status || "Activo"}`;
-      if (match.observaciones) {
-        responseMessage += `\n   📝 ${match.observaciones}`;
-      }
-      responseMessage += `\n`;
-    });
-
-    if (result.coincidences > 3) {
-      responseMessage += `\n... y ${
-        result.coincidences - 3
-      } coincidencias más.`;
-    }
-  } else {
-    responseMessage += `\n✅ *SIN COINCIDENCIAS*
-
-🎉 La persona consultada *NO aparece* en las listas restrictivas.
-
-📋 *Listas consultadas:* OFAC, DEA, SAT, PEP, FBI, LPB`;
-  }
-
+  // Preparar datos para el mensaje de resultados mejorado
+  const resultsData = {
+    coincidences: result.coincidences,
+    searchTime: result.performance?.processing_time_ms || '3200',
+    pages: 1,
+    reportId: `KYC-${Date.now()}`,
+    matches: result.person?.slice(0, 3).map(match => ({
+      lista: match.tipo,
+      porcentaje: match.porcentaje_coincidencia
+    }))
+  };
+  
+  const responseMessage = enhancedMenus.getResultsMessage(resultsData);
   await sendWhatsAppMessage(from, responseMessage);
 
   // Enviar PDF si está disponible
@@ -478,17 +597,19 @@ Para volver al menú, escribe *menu*.`
       if (pdfUrl) {
         await sendWhatsAppMessage(
           from,
-          `📄 *Reporte PDF disponible:*
+          `📄 *Reporte PDF Generado*
+━━━━━━━━━━━━━━━━━━
 
 ${pdfUrl}
 
-*Contenido del reporte:*
-• Datos consultados
-• Resultados de búsqueda
-• Detalles de coincidencias
-• Fecha y hora de consulta
+*📋 Contenido del reporte:*
+• ✅ Datos consultados
+• 📊 Resultados de búsqueda  
+• 📝 Detalles de coincidencias
+• 🕐 Fecha y hora de consulta
 
-El archivo estará disponible por 24 horas.`,
+━━━━━━━━━━━━━━━━━━
+⏰ _El archivo estará disponible por 24 horas_`,
           pdfUrl
         );
       } else {
@@ -510,17 +631,8 @@ El archivo estará disponible por 24 horas.`,
   session.state = STATES.WELCOME;
   session.data = {};
 
-  setTimeout(async () => {
-    const finalMessage = `🔄 *¿Qué deseas hacer ahora?*
-
-*1* - 🔎 Nueva búsqueda
-*2* - ℹ️ Información del sistema  
-*3* - 📞 Contacto soporte
-
-_Sistema KYC-LISTAS v1.0_`;
-
-    await sendWhatsAppMessage(from, finalMessage);
-  }, 3000);
+  // El mensaje de resultados mejorado ya incluye las opciones de acción
+  // No necesitamos el mensaje adicional
 }
 
 // Endpoint para status de mensajes
@@ -601,6 +713,14 @@ app.post("/webhook", async (req, res) => {
 
       case STATES.WAITING_AMATERNO:
         await handleAmaterno(from, body, session);
+        break;
+
+      case STATES.ADVANCED_SEARCH:
+        await handleAdvancedSearch(from, body, session);
+        break;
+
+      case STATES.WAITING_PERCENTAGE:
+        await handleWaitingPercentage(from, body, session);
         break;
 
       default:

@@ -47,12 +47,14 @@ npm install               # Install all dependencies from package.json
 
 Environment variables (`.env`):
 - `TWILIO_ACCOUNT_SID`: Twilio account credentials
-- `TWILIO_AUTH_TOKEN`: Twilio authentication
-- `TWILIO_WHATSAPP_NUMBER`: WhatsApp sandbox number
-- `KYC_API_URL`: Base URL for KYC API (default: `http://localhost:3000/api/listas`)
-- `KYC_API_KEY`: API authentication key
+- `TWILIO_AUTH_TOKEN`: Twilio authentication  
+- `TWILIO_WHATSAPP_NUMBER`: WhatsApp Business number (whatsapp:+5215590637019)
+- `KYC_API_URL`: KYC API endpoint (https://kyc-listas.com/api/listas/search)
+- `KYC_API_KEY`: API authentication key (X-API-KEY header)
 - `PORT`: Server port (default: 3001)
-- `SERVER_URL`: Public URL for serving PDFs
+- `SERVER_URL`: Public URL for serving PDFs (https://kyc-bots.com)
+- `DB_HOST`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`: MySQL database connection
+- `ADMIN_USER`, `ADMIN_PASS`: Admin panel credentials
 
 ## API Integration Details
 
@@ -66,9 +68,14 @@ The bot integrates with KYC-LISTAS API (`API_DOCUMENTATION.md`) which provides:
 ## File Structure
 
 - `server.js`: Main application with all bot logic
+- `authService.js`: User authorization and access control
+- `database.js`: MySQL connection pool configuration
+- `admin-routes.js`: Admin panel API endpoints
+- `public/admin.html`: Web-based administration panel
 - `API_DOCUMENTATION.md`: Complete KYC API documentation
 - `temp/`: Temporary PDF storage (auto-cleaned after 24h)
 - `logs/`: Application logs organized by date
+- `WHATSAPP_BUSINESS_PRODUCTION_COMPLETE.md`: Complete production setup guide
 
 ## Important Patterns
 
