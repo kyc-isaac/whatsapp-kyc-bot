@@ -925,8 +925,10 @@ async function handleSearchResult(from, session, result) {
     await sendWhatsAppMessage(from, "📄 *Generando reporte PDF...*");
 
     try {
-      const fileName = `KYC_${session.data.nombre.replace(
-        / /g,
+      // Obtener nombre para el archivo - puede ser de búsqueda normal o INE OCR
+      const searchName = session.data.nombre || session.data.nombreCompleto || "BUSQUEDA";
+      const fileName = `KYC_${searchName.replace(
+        /[\s\/\*\?\|\<\>:"]/g,
         "_"
       )}_${Date.now()}.pdf`;
       const pdfUrl = convertBase64ToFile(result.pdf.base64, fileName);
@@ -1076,6 +1078,9 @@ async function processIneOcrAndSearch(from, session) {
     const nombreCompleto = `${ocrResult.nombres || ''} ${ocrResult.primerApellido || ''} ${ocrResult.segundoApellido || ''}`.trim();
     log(`OCR exitoso para ${authService.maskPhoneNumber(from)}: ${nombreCompleto}`);
     log(`Datos extraídos - Nombres: ${ocrResult.nombres}, Primer: ${ocrResult.primerApellido}, Segundo: ${ocrResult.segundoApellido}`);
+    
+    // Guardar el nombre completo en la sesión para el PDF
+    session.data.nombreCompleto = nombreCompleto;
     
     // Usar el nombre completo para buscar en listas
     const kycSearchData = {
