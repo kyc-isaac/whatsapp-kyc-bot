@@ -29,33 +29,33 @@ _Responde con el número de tu elección_`;
 }
 
 /**
- * Menú de Tipo de Búsqueda
+ * Menú de Tipo de Búsqueda (Dinámico según permisos del usuario)
  */
-function getSearchTypeMenu() {
-  return `🔍 *Tipo de Búsqueda KYC*
+function getSearchTypeMenu(hasIneOcrPermission = false) {
+  let menu = `🔍 *BÚSQUEDA POR TIPO*
 ━━━━━━━━━━━━━━━━━━
 
-Selecciona el tipo de búsqueda:
+1️⃣ 👤 *Persona Física* (Nombres separados)
+2️⃣ 👤 *Persona Física* (Nombre completo)  
+3️⃣ 🏢 *Persona Moral*`;
 
-*TIPO DE ENTIDAD*
-1️⃣ 👤 *Persona Física*
-      _Nombre y apellidos separados_
+  // Agregar opción INE OCR si el usuario tiene permiso
+  if (hasIneOcrPermission) {
+    menu += `
+4️⃣ 📷 *Búsqueda con INE*
+      _Envía fotos de tu credencial_`;
+  }
 
-2️⃣ 👤 *Persona Física - Nombre Completo*
-      _Búsqueda por nombre completo_
-
-3️⃣ 🏢 *Empresa / Razón Social*
-      _Búsqueda por nombre comercial_
-
-*BÚSQUEDAS ESPECIALES*
-4️⃣ 📊 *Búsqueda Masiva*
-      _Hasta 10 registros simultáneos_
-
-5️⃣ ⚙️ *Búsqueda Avanzada*
-      _Con parámetros específicos_
+  menu += `
 
 ━━━━━━━━━━━━━━━━━━
+💡 Búsquedas con 98% de coincidencia (recomendado)
+📊 Para cambiar %, escribe: P seguido del número
+    Ejemplo: P85 para 85%
+    
 ↩️ Escribe *0* para volver al menú principal`;
+
+  return menu;
 }
 
 /**
@@ -481,6 +481,75 @@ Ellos podrán ayudarte a:
 2️⃣ 🏠 *Menú Principal*`;
 }
 
+/**
+ * Mensajes para Búsqueda con INE OCR
+ */
+function getIneStep1Message() {
+  return `📷 *BÚSQUEDA CON INE - PASO 1/2*
+━━━━━━━━━━━━━━━━━━
+
+📸 Por favor envía una foto clara del *FRENTE* de tu INE
+
+✅ *Asegúrate que:*
+• La foto sea legible
+• No tenga reflejos
+• Se vea completa la credencial
+• Esté bien iluminada
+
+⏳ Esperando foto frontal...
+
+━━━━━━━━━━━━━━━━━━
+↩️ Escribe *menu* para cancelar`;
+}
+
+function getIneStep2Message() {
+  return `📷 *BÚSQUEDA CON INE - PASO 2/2*
+━━━━━━━━━━━━━━━━━━
+
+✅ Foto frontal recibida
+
+📸 Ahora envía una foto clara del *REVERSO* de tu INE
+
+⏳ Esperando foto reverso...
+
+━━━━━━━━━━━━━━━━━━
+↩️ Escribe *menu* para cancelar`;
+}
+
+function getIneProcessingMessage() {
+  return `🔍 *PROCESANDO INE...*
+━━━━━━━━━━━━━━━━━━
+
+📷 Leyendo información de la credencial...
+🔎 Realizando búsqueda automática...
+
+⏳ Por favor espera, puede tomar hasta 30 segundos...`;
+}
+
+function getIneErrorMessage() {
+  return `❌ *ERROR EN LECTURA DE INE*
+━━━━━━━━━━━━━━━━━━
+
+No se pudo leer la información de tu INE.
+
+*Posibles causas:*
+• Foto borrosa o con reflejos
+• Credencial dañada o ilegible
+• Formato no compatible
+
+🔄 *¿Deseas intentar de nuevo?*
+1️⃣ Sí, reintentar
+2️⃣ No, volver al menú
+
+━━━━━━━━━━━━━━━━━━`;
+}
+
+function getPercentageUpdateMessage(percentage) {
+  return `✅ *Porcentaje actualizado a ${percentage}%*
+
+Ahora selecciona el tipo de búsqueda (1-3)`;
+}
+
 module.exports = {
   getEnhancedMainMenu,
   getSearchTypeMenu,
@@ -494,5 +563,10 @@ module.exports = {
   getSessionExpiredMessage,
   getRecentSearches,
   getUserStats,
-  getSearchLimitMessage
+  getSearchLimitMessage,
+  getIneStep1Message,
+  getIneStep2Message,
+  getIneProcessingMessage,
+  getIneErrorMessage,
+  getPercentageUpdateMessage
 };

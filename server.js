@@ -28,9 +28,13 @@ const accountSid = process.env.TWILIO_ACCOUNT_SID;
 const authToken = process.env.TWILIO_AUTH_TOKEN;
 const client = twilio(accountSid, authToken);
 
-// Configuración de tu API KYC
+// Configuración de tu API KYC (búsqueda en listas)
 const KYC_API_URL = process.env.KYC_API_URL;
 const KYC_API_KEY = process.env.KYC_API_KEY;
+
+// Configuración de API KYC Validación (OCR y validaciones)
+const KYC_VALIDATION_API_URL = process.env.KYC_VALIDATION_API_URL;
+const KYC_VALIDATION_API_KEY = process.env.KYC_VALIDATION_API_KEY;
 
 // Store para mantener el estado de conversación de cada usuario
 const userSessions = new Map();
@@ -115,8 +119,10 @@ const STATES = {
   WAITING_APATERNO: "waiting_apaterno",
   WAITING_AMATERNO: "waiting_amaterno",
   WAITING_PERSON_TYPE: "waiting_person_type",
-  ADVANCED_SEARCH: "advanced_search",
-  WAITING_PERCENTAGE: "waiting_percentage",
+  WAITING_INE_FRONT: "waiting_ine_front",
+  WAITING_INE_BACK: "waiting_ine_back",
+  PROCESSING_OCR: "processing_ocr",
+  INE_ERROR_RETRY: "ine_error_retry",
   HELP_MENU: "help_menu",
   PROCESSING: "processing",
 };
@@ -273,6 +279,61 @@ async function searchKYC(searchData) {
   }
 }
 
+// Función para descargar imagen de Twilio y convertir a base64
+async function downloadImageToBase64(mediaUrl) {
+  try {
+    const response = await axios.get(mediaUrl, {
+      auth: {
+        username: accountSid,
+        password: authToken
+      },
+      responseType: 'arraybuffer'
+    });
+    
+    return Buffer.from(response.data).toString('base64');
+  } catch (error) {
+    log(`Error descargando imagen: ${error.message}`, "ERROR");
+    throw error;
+  }
+}
+
+// Función para hacer OCR de INE
+async function processIneOcr(frontImageBase64, backImageBase64) {
+  try {
+    log(`Iniciando OCR de INE`);
+    
+    const response = await axios.post(
+      `${KYC_VALIDATION_API_URL}/obtener_datos_id`,
+      {
+        id: frontImageBase64,
+        idReverso: backImageBase64
+      },
+      {
+        headers: {
+          "Content-Type": "application/json",
+          "X-API-KEY": KYC_VALIDATION_API_KEY,
+        },
+        timeout: 30000, // 30 segundos para OCR
+      }
+    );
+
+    log(`OCR de INE completado exitosamente`);
+    return response.data;
+  } catch (error) {
+    log(`Error en OCR de INE: ${error.response?.data?.message || error.message}`, "ERROR");
+    
+    if (error.response) {
+      log(`Status Code: ${error.response.status}`, "ERROR");
+      log(`Response Data: ${JSON.stringify(error.response.data)}`, "ERROR");
+    }
+    
+    return {
+      err: true,
+      message: error.response?.data?.message || "Error procesando INE",
+    };
+  }
+}
+
 // Manejadores de estado
 async function handleWelcome(from, body, session) {
   const option = body.trim();
@@ -301,13 +362,33 @@ async function handleWelcome(from, body, session) {
     return; // Importante: salir aquí para no procesar como opción
   }
 
+  // Manejar comando de cambio de porcentaje (P##)
+  if (option.toLowerCase().startsWith('p') && option.length > 1) {
+    const percentageStr = option.substring(1);
+    const percentage = parseInt(percentageStr);
+    
+    if (percentage >= 70 && percentage <= 100) {
+      session.data = session.data || {};
+      session.data.porcentaje_min = percentage;
+      
+      const updateMessage = enhancedMenus.getPercentageUpdateMessage(percentage);
+      await sendWhatsAppMessage(from, updateMessage);
+      return;
+    } else {
+      await sendWhatsAppMessage(from, `❌ Porcentaje inválido. Debe ser entre 70 y 100.
+Ejemplo: P85 para 85%`);
+      return;
+    }
+  }
+
   // Procesar opciones del menú
   if (option === "1") {
     session.state = STATES.WAITING_PERSON_TYPE;
-    session.data = {};
+    session.data = session.data || {};
 
-    // Usar menú de tipo de búsqueda mejorado
-    const searchTypeMessage = enhancedMenus.getSearchTypeMenu();
+    // Usar menú de tipo de búsqueda mejorado con permisos del usuario
+    const hasIneOcrPermission = session.user?.ine_ocr_enabled || false;
+    const searchTypeMessage = enhancedMenus.getSearchTypeMenu(hasIneOcrPermission);
     await sendWhatsAppMessage(from, searchTypeMessage);
     
   } else if (option === "2") {
@@ -417,22 +498,14 @@ async function handlePersonType(from, body, session) {
 
     await sendWhatsAppMessage(from, nameMessage);
     
-  } else if (option === "5") {
-    // Opción de búsqueda avanzada
-    session.state = STATES.ADVANCED_SEARCH;
-    await sendWhatsAppMessage(from, `⚙️ *Búsqueda Avanzada*
-━━━━━━━━━━━━━━━━━━
-
-Selecciona el tipo de configuración:
-
-1️⃣ 👤 *Persona Física* (con opciones avanzadas)
-2️⃣ 🏢 *Empresa* (con opciones avanzadas)
-3️⃣ 📊 *Configurar Porcentaje de Coincidencia*
-      _Actual: 98% (recomendado)_
-
-━━━━━━━━━━━━━━━━━━
-💡 *Nota:* 98% reduce falsos positivos
-↩️ Escribe *menu* para volver`);
+  } else if (option === "4" && session.user?.ine_ocr_enabled) {
+    // Búsqueda con INE OCR (solo si el usuario tiene permiso)
+    session.data.persona = "ine_ocr";
+    session.data.porcentaje_min = session.data.porcentaje_min || 98;
+    session.state = STATES.WAITING_INE_FRONT;
+    
+    const ineMessage = enhancedMenus.getIneStep1Message();
+    await sendWhatsAppMessage(from, ineMessage);
     
   } else if (option === "0" || body.toLowerCase() === "menu") {
     session.state = STATES.WELCOME;
@@ -549,123 +622,6 @@ async function handleAmaterno(from, body, session) {
   await processSearch(from, session);
 }
 
-async function handleAdvancedSearch(from, body, session) {
-  const option = body.trim();
-  
-  if (option === "1" || option === "2") {
-    // Persona física o moral con opciones avanzadas
-    session.data.persona = option;
-    session.data.porcentaje_min = session.data.porcentaje_min || 98;
-    session.state = STATES.WAITING_NAME;
-    
-    const nameMessage = option === "1"
-      ? `👤 *Persona Física - Búsqueda Avanzada*
-━━━━━━━━━━━━━━━━━━
-
-📝 Escribe el *nombre(s)* de la persona:
-
-*Ejemplo:* JUAN CARLOS
-💡 *Nota:* Solo el nombre, después te pediré los apellidos
-
-*Configuración actual:*
-• 📊 Porcentaje: *${session.data.porcentaje_min || 98}%*
-
-━━━━━━━━━━━━━━━━━━
-↩️ Para cancelar, escribe *menu*`
-      : `🏢 *Empresa - Búsqueda Avanzada*  
-━━━━━━━━━━━━━━━━━━
-
-📝 Escribe la *razón social completa*:
-
-*Ejemplo:* CONSTRUCTORA EJEMPLO SA DE CV
-
-*Configuración actual:*
-• 📊 Porcentaje: *${session.data.porcentaje_min || 98}%*
-
-━━━━━━━━━━━━━━━━━━
-↩️ Para cancelar, escribe *menu*`;
-    
-    await sendWhatsAppMessage(from, nameMessage);
-    
-  } else if (option === "3") {
-    // Configurar porcentaje
-    session.state = STATES.WAITING_PERCENTAGE;
-    await sendWhatsAppMessage(from, `📊 *Configurar Porcentaje de Coincidencia*
-━━━━━━━━━━━━━━━━━━
-
-*Porcentaje actual:* ${session.data.porcentaje_min || 98}%
-
-Escribe el nuevo porcentaje (entre 50% y 99%):
-
-*Recomendaciones:*
-• 📈 *98%* - Recomendado (menos falsos positivos)
-• 📊 *90%* - Balanceado
-• 📉 *75%* - Más permisivo (más coincidencias)
-
-━━━━━━━━━━━━━━━━━━
-💡 *Nota:* Mayor porcentaje = Mayor precisión
-↩️ Escribe *menu* para cancelar`);
-    
-  } else if (body.toLowerCase() === "menu") {
-    session.state = STATES.WELCOME;
-    await handleWelcome(from, "", session);
-  } else {
-    await sendWhatsAppMessage(from, `❌ *Opción Inválida*
-━━━━━━━━━━━━━━━━━━
-
-Selecciona una opción válida:
-
-1️⃣ *Persona Física*
-2️⃣ *Empresa* 
-3️⃣ *Configurar Porcentaje*
-
-━━━━━━━━━━━━━━━━━━
-↩️ Escribe *menu* para volver`);
-  }
-}
-
-async function handleWaitingPercentage(from, body, session) {
-  if (body.toLowerCase() === "menu") {
-    session.state = STATES.WELCOME;
-    await handleWelcome(from, "", session);
-    return;
-  }
-
-  const percentage = parseInt(body.replace('%', ''));
-  
-  if (isNaN(percentage) || percentage < 50 || percentage > 99) {
-    await sendWhatsAppMessage(from, `❌ *Porcentaje Inválido*
-━━━━━━━━━━━━━━━━━━
-
-Debe ser un número entre 50 y 99.
-
-*Ejemplos válidos:*
-• 98
-• 90
-• 75
-
-━━━━━━━━━━━━━━━━━━
-🔄 Intenta nuevamente o escribe *menu* para cancelar`);
-    return;
-  }
-
-  session.data.porcentaje_min = percentage;
-  session.state = STATES.ADVANCED_SEARCH;
-  
-  await sendWhatsAppMessage(from, `✅ *Porcentaje Configurado*
-━━━━━━━━━━━━━━━━━━
-
-Nuevo porcentaje: *${percentage}%*
-
-⚙️ *Búsqueda Avanzada*
-
-1️⃣ 👤 *Persona Física* 
-2️⃣ 🏢 *Empresa*
-3️⃣ 📊 *Cambiar Porcentaje* _(${percentage}%)_
-
-━━━━━━━━━━━━━━━━━━
-↩️ Escribe *menu* para volver al inicio`);
-}
 
 async function handleHelpMenu(from, body, session) {
   const option = body.trim();
@@ -1016,6 +972,139 @@ ${pdfUrl}
   // No necesitamos el mensaje adicional
 }
 
+// Funciones para manejo de INE OCR
+async function handleIneImageUpload(from, body, session, req) {
+  // Manejar comando cancelar
+  if (body.toLowerCase() === 'menu') {
+    session.state = STATES.WELCOME;
+    await handleWelcome(from, 'hola', session);
+    return;
+  }
+
+  // Verificar si hay imagen adjunta
+  const mediaUrl = req.body.MediaUrl0;
+  const mediaContentType = req.body.MediaContentType0;
+  
+  if (!mediaUrl || !mediaContentType?.startsWith('image/')) {
+    await sendWhatsAppMessage(from, `📸 Por favor envía una imagen.
+    
+${session.state === STATES.WAITING_INE_FRONT ? 
+  'Necesito la foto del FRENTE de tu INE.' : 
+  'Necesito la foto del REVERSO de tu INE.'}
+
+↩️ Escribe *menu* para cancelar`);
+    return;
+  }
+
+  try {
+    // Descargar y convertir imagen a base64
+    const imageBase64 = await downloadImageToBase64(mediaUrl);
+    
+    if (session.state === STATES.WAITING_INE_FRONT) {
+      // Guardar imagen frontal y pedir reverso
+      session.data.ineFrontBase64 = imageBase64;
+      session.state = STATES.WAITING_INE_BACK;
+      
+      const step2Message = enhancedMenus.getIneStep2Message();
+      await sendWhatsAppMessage(from, step2Message);
+      
+    } else if (session.state === STATES.WAITING_INE_BACK) {
+      // Tenemos ambas imágenes, procesar OCR
+      session.data.ineBackBase64 = imageBase64;
+      session.state = STATES.PROCESSING_OCR;
+      
+      const processingMessage = enhancedMenus.getIneProcessingMessage();
+      await sendWhatsAppMessage(from, processingMessage);
+      
+      // Procesar OCR
+      await processIneOcrAndSearch(from, session);
+    }
+    
+  } catch (error) {
+    log(`Error procesando imagen INE: ${error.message}`, "ERROR");
+    
+    // Ir a estado de error
+    session.state = STATES.INE_ERROR_RETRY;
+    const errorMessage = enhancedMenus.getIneErrorMessage();
+    await sendWhatsAppMessage(from, errorMessage);
+  }
+}
+
+async function handleIneErrorRetry(from, body, session) {
+  const option = body.trim();
+  
+  if (option === "1") {
+    // Reintentar - volver al paso 1
+    session.state = STATES.WAITING_INE_FRONT;
+    session.data.ineFrontBase64 = null;
+    session.data.ineBackBase64 = null;
+    
+    const step1Message = enhancedMenus.getIneStep1Message();
+    await sendWhatsAppMessage(from, step1Message);
+    
+  } else if (option === "2" || body.toLowerCase() === "menu") {
+    // Volver al menú
+    session.state = STATES.WELCOME;
+    await handleWelcome(from, 'hola', session);
+    
+  } else {
+    await sendWhatsAppMessage(from, "Por favor selecciona 1 para reintentar o 2 para volver al menú.");
+  }
+}
+
+async function processIneOcrAndSearch(from, session) {
+  try {
+    // Hacer OCR de las imágenes INE
+    const ocrResult = await processIneOcr(
+      session.data.ineFrontBase64,
+      session.data.ineBackBase64
+    );
+    
+    // Limpiar imágenes de la sesión (seguridad)
+    delete session.data.ineFrontBase64;
+    delete session.data.ineBackBase64;
+    
+    if (ocrResult.err) {
+      // Error en OCR
+      session.state = STATES.INE_ERROR_RETRY;
+      const errorMessage = enhancedMenus.getIneErrorMessage();
+      await sendWhatsAppMessage(from, errorMessage);
+      return;
+    }
+    
+    // OCR exitoso - procesar búsqueda automática
+    log(`OCR exitoso para ${authService.maskPhoneNumber(from)}: ${ocrResult.nombre}`);
+    
+    // Usar el nombre extraído para buscar en listas
+    const kycSearchData = {
+      persona: "2", // Enviar como empresa/persona moral
+      nombre: ocrResult.nombre,
+      porcentaje_min: session.data.porcentaje_min || 98,
+    };
+    
+    // Realizar búsqueda en listas KYC
+    const searchResult = await searchKYC(kycSearchData);
+    
+    // Si la búsqueda fue exitosa, incrementar contador
+    if (!searchResult.err) {
+      const newCount = incrementDailySearchCount(from);
+      const userLimit = getUserSearchLimit(from);
+      log(`Búsqueda INE completada para ${authService.maskPhoneNumber(from)}: ${newCount}/${userLimit === -1 ? 'Ilimitadas' : userLimit}`);
+    }
+    
+    // Mostrar resultados
+    await handleSearchResult(from, session, searchResult);
+    
+  } catch (error) {
+    log(`Error en proceso completo INE OCR: ${error.message}`, "ERROR");
+    
+    // Error general
+    session.state = STATES.INE_ERROR_RETRY;
+    const errorMessage = enhancedMenus.getIneErrorMessage();
+    await sendWhatsAppMessage(from, errorMessage);
+  }
+}
+
 // Endpoint para status de mensajes
 app.post("/webhook/status", (req, res) => {
   console.log("Status callback:", req.body);
@@ -1096,12 +1185,20 @@ app.post("/webhook", async (req, res) => {
         await handleAmaterno(from, body, session);
         break;
 
-      case STATES.ADVANCED_SEARCH:
-        await handleAdvancedSearch(from, body, session);
+      case STATES.WAITING_INE_FRONT:
+        await handleIneImageUpload(from, body, session, req);
         break;
 
-      case STATES.WAITING_PERCENTAGE:
-        await handleWaitingPercentage(from, body, session);
+      case STATES.WAITING_INE_BACK:
+        await handleIneImageUpload(from, body, session, req);
+        break;
+
+      case STATES.PROCESSING_OCR:
+        await sendWhatsAppMessage(from, "🔄 Aún procesando tu INE, por favor espera...");
+        break;
+
+      case STATES.INE_ERROR_RETRY:
+        await handleIneErrorRetry(from, body, session);
         break;
 
       case STATES.HELP_MENU:

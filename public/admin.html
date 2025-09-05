@@ -448,6 +448,15 @@
                     <label>Límite personalizado:</label>
                     <input type="number" id="customSearchLimit" min="1" max="10000" placeholder="Ej: 75">
                 </div>
+                <div class="form-group">
+                    <label style="display: flex; align-items: center; gap: 8px;">
+                        <input type="checkbox" id="ineOcrEnabled"> 
+                        📷 Permitir búsqueda con foto de INE
+                    </label>
+                    <small style="color: #666; font-size: 12px; margin-left: 24px;">
+                        El usuario podrá enviar fotos de su INE para búsquedas automáticas
+                    </small>
+                </div>
                 <div class="modal-buttons">
                     <button type="button" class="btn btn-danger" onclick="closeModal()">Cancelar</button>
                     <button type="submit" class="btn btn-primary">Guardar</button>
@@ -549,6 +558,7 @@
                             <th>Empresa</th>
                             <th>Estado</th>
                             <th>Límite Diario</th>
+                            <th>Búsq. INE</th>
                             <th>Consultas</th>
                             <th>Último Acceso</th>
                             <th>Acciones</th>
@@ -574,6 +584,9 @@
                     limitClass = 'limit-standard';
                 }
                 
+                const ineOcrText = user.ine_ocr_enabled ? '📷 Sí' : 'No';
+                const ineOcrClass = user.ine_ocr_enabled ? 'status-active' : 'status-inactive';
+                
                 html += `
                     <tr>
                         <td>${user.id}</td>
@@ -582,6 +595,7 @@
                         <td>${user.company || '-'}</td>
                         <td><span class="${statusClass}">${statusText}</span></td>
                         <td><span class="limit-badge ${limitClass}">${searchLimitText}</span></td>
+                        <td><span class="${ineOcrClass}">${ineOcrText}</span></td>
                         <td>${user.total_queries}</td>
                         <td>${lastAccess}</td>
                         <td>
@@ -642,6 +656,9 @@
                 document.getElementById('customSearchLimitGroup').style.display = 'block';
             }
             
+            // Configurar INE OCR
+            document.getElementById('ineOcrEnabled').checked = user.ine_ocr_enabled || false;
+            
             document.getElementById('userModal').classList.add('active');
         }
 
@@ -682,7 +699,8 @@
                 full_name: document.getElementById('fullName').value,
                 company: document.getElementById('company').value || null,
                 is_active: document.getElementById('isActive').value === '1',
-                search_limit: searchLimit
+                search_limit: searchLimit,
+                ine_ocr_enabled: document.getElementById('ineOcrEnabled').checked
             };
 
             try {

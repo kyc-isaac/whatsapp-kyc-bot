@@ -31,6 +31,41 @@ const adminAuth = (req, res, next) => {
 // Aplicar autenticación a todas las rutas admin
 router.use(adminAuth);
 
+// Migración: Agregar columna ine_ocr_enabled si no existe
+router.post('/migrate-ine-ocr', async (req, res) => {
+  try {
+    // Verificar si la columna ya existe
+    const [columns] = await pool.query(`
+      SHOW COLUMNS FROM authorized_users LIKE 'ine_ocr_enabled'
+    `);
+    
+    if (columns.length === 0) {
+      // Agregar la columna ine_ocr_enabled
+      await pool.query(`
+        ALTER TABLE authorized_users 
+        ADD COLUMN ine_ocr_enabled BOOLEAN DEFAULT FALSE 
+        COMMENT 'Permite al usuario hacer búsquedas enviando fotos de INE'
+      `);
+      
+      res.json({
+        success: true,
+        message: 'Columna ine_ocr_enabled agregada exitosamente'
+      });
+    } else {
+      res.json({
+        success: true,
+        message: 'La columna ine_ocr_enabled ya existe'
+      });
+    }
+  } catch (error) {
+    console.error('Error en migración:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
 // Migración: Agregar columna search_limit si no existe
 router.post('/migrate-search-limits', async (req, res) => {
   try {
@@ -76,6 +111,7 @@ router.get('/users', async (req, res) => {
         company,
         is_active,
         search_limit,
+        ine_ocr_enabled,
         created_at,
         last_access,
         total_queries
@@ -91,7 +127,7 @@ router.get('/users', async (req, res) => {
 
 // POST - Agregar nuevo usuario
 router.post('/users', async (req, res) => {
-  const { phone_number, full_name, company, search_limit } = req.body;
+  const { phone_number, full_name, company, search_limit, ine_ocr_enabled } = req.body;
   
   if (!phone_number || !full_name) {
     return res.status(400).json({ error: 'Número y nombre son requeridos' });
@@ -108,8 +144,8 @@ router.post('/users', async (req, res) => {
   
   try {
     const [result] = await pool.query(
-      'INSERT INTO authorized_users (phone_number, full_name, company, search_limit) VALUES (?, ?, ?, ?)',
-      [formattedNumber, full_name, company || null, finalSearchLimit]
+      'INSERT INTO authorized_users (phone_number, full_name, company, search_limit, ine_ocr_enabled) VALUES (?, ?, ?, ?, ?)',
+      [formattedNumber, full_name, company || null, finalSearchLimit, ine_ocr_enabled || false]
     );
     
     res.json({ 
@@ -130,7 +166,7 @@ router.post('/users', async (req, res) => {
 // PUT - Actualizar usuario
 router.put('/users/:id', async (req, res) => {
   const { id } = req.params;
-  const { full_name, company, is_active, search_limit } = req.body;
+  const { full_name, company, is_active, search_limit, ine_ocr_enabled } = req.body;
   
   // Validar search_limit
   let finalSearchLimit = search_limit || 100;
@@ -141,9 +177,9 @@ router.put('/users/:id', async (req, res) => {
   try {
     await pool.query(
       `UPDATE authorized_users 
-       SET full_name = ?, company = ?, is_active = ?, search_limit = ?
+       SET full_name = ?, company = ?, is_active = ?, search_limit = ?, ine_ocr_enabled = ?
        WHERE id = ?`,
-      [full_name, company, is_active, finalSearchLimit, id]
+      [full_name, company, is_active, finalSearchLimit, ine_ocr_enabled || false, id]
     );
     
     res.json({ message: 'Usuario actualizado exitosamente' });
