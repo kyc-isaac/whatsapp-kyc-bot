@@ -318,7 +318,6 @@ async function processIneOcr(frontImageBase64, backImageBase64) {
     );
 
     log(`OCR de INE completado exitosamente`);
-    log(`OCR Response completo: ${JSON.stringify(response.data)}`);
     return response.data;
   } catch (error) {
     log(`Error en OCR de INE: ${error.response?.data?.message || error.message}`, "ERROR");
@@ -1073,14 +1072,15 @@ async function processIneOcrAndSearch(from, session) {
       return;
     }
     
-    // OCR exitoso - procesar búsqueda automática
-    log(`OCR exitoso para ${authService.maskPhoneNumber(from)}: ${ocrResult.nombre}`);
-    log(`Datos completos OCR: ${JSON.stringify(ocrResult)}`);
+    // OCR exitoso - construir nombre completo
+    const nombreCompleto = `${ocrResult.nombres || ''} ${ocrResult.primerApellido || ''} ${ocrResult.segundoApellido || ''}`.trim();
+    log(`OCR exitoso para ${authService.maskPhoneNumber(from)}: ${nombreCompleto}`);
+    log(`Datos extraídos - Nombres: ${ocrResult.nombres}, Primer: ${ocrResult.primerApellido}, Segundo: ${ocrResult.segundoApellido}`);
     
-    // Usar el nombre extraído para buscar en listas
+    // Usar el nombre completo para buscar en listas
     const kycSearchData = {
       persona: "2", // Enviar como empresa/persona moral
-      nombre: ocrResult.nombre,
+      nombre: nombreCompleto,
       porcentaje_min: session.data.porcentaje_min || 98,
     };
     
