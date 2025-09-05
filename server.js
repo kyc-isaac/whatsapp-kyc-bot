@@ -318,6 +318,7 @@ async function processIneOcr(frontImageBase64, backImageBase64) {
     );
 
     log(`OCR de INE completado exitosamente`);
+    log(`OCR Response completo: ${JSON.stringify(response.data)}`);
     return response.data;
   } catch (error) {
     log(`Error en OCR de INE: ${error.response?.data?.message || error.message}`, "ERROR");
@@ -1074,6 +1075,7 @@ async function processIneOcrAndSearch(from, session) {
     
     // OCR exitoso - procesar búsqueda automática
     log(`OCR exitoso para ${authService.maskPhoneNumber(from)}: ${ocrResult.nombre}`);
+    log(`Datos completos OCR: ${JSON.stringify(ocrResult)}`);
     
     // Usar el nombre extraído para buscar en listas
     const kycSearchData = {
