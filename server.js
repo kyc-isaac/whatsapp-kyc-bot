@@ -1,5 +1,8 @@
 require("dotenv").config();
 const express = require("express");
+const session = require("express-session");
+const bcrypt = require("bcryptjs");
+const csrf = require("csrf");
 const twilio = require("twilio");
 const axios = require("axios");
 const fs = require("fs");
@@ -16,12 +19,70 @@ const app = express();
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
+// Verificar que el secreto de sesión esté configurado
+const sessionSecret = process.env.SESSION_SECRET;
+if (!sessionSecret) {
+  console.error('❌ ERROR: SESSION_SECRET environment variable is required');
+  process.exit(1);
+}
+
+// Configuración de sesiones
+app.use(session({
+  secret: sessionSecret,
+  resave: false,
+  saveUninitialized: false,
+  cookie: { 
+    secure: process.env.NODE_ENV === 'production', // Automático según ambiente
+    httpOnly: true, // Prevenir acceso via JavaScript del cliente
+    sameSite: 'strict', // Protección CSRF
+    maxAge: 24 * 60 * 60 * 1000 // 24 horas
+  }
+}));
+
+// Middleware para verificar autenticación en rutas admin
+function requireAuth(req, res, next) {
+  if (req.path === '/login.html' || req.path === '/api/admin/login') {
+    return next();
+  }
+  
+  if (!req.session.authenticated) {
+    if (req.path.startsWith('/api/')) {
+      return res.status(401).json({ success: false, message: 'No autorizado' });
+    } else {
+      return res.redirect('/admin/login.html');
+    }
+  }
+  
+  next();
+}
+
+// Ruta específica para el root del admin panel - DEBE IR ANTES del static middleware
+app.get('/admin', requireAuth, (req, res) => {
+  console.log('🎯 Serving admin.html for /admin');
+  res.sendFile(path.join(__dirname, 'public', 'admin.html'));
+});
+
+app.get('/admin/', requireAuth, (req, res) => {
+  console.log('🎯 Serving admin.html for /admin/');
+  res.sendFile(path.join(__dirname, 'public', 'admin.html'));
+});
+
+// Aplicar middleware de auth solo a rutas admin
+app.use('/admin', requireAuth);
+
 // Servir archivos estáticos para el panel admin
 app.use('/admin', express.static('public'));
 
 // Importar y usar rutas de administración
-const adminRoutes = require('./admin-routes');
-app.use('/api/admin', adminRoutes);
+console.log('📋 Importing admin routes...');
+try {
+  const adminRoutes = require('./admin-routes');
+  console.log('✅ Admin routes imported successfully');
+  app.use('/api/admin', adminRoutes);
+  console.log('✅ Admin routes mounted at /api/admin');
+} catch (error) {
+  console.error('❌ Error importing admin routes:', error);
+}
 
 // Configuración de Twilio
 const accountSid = process.env.TWILIO_ACCOUNT_SID;

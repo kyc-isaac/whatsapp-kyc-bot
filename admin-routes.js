@@ -3,36 +3,109 @@ const router = express.Router();
 const { pool } = require('./database');
 const bcrypt = require('bcryptjs');
 
-// Middleware de autenticación básica
+// Verificar que las credenciales de admin estén configuradas
+const ADMIN_USER = process.env.ADMIN_USER;
+const ADMIN_PASS = process.env.ADMIN_PASS;
+
+if (!ADMIN_USER || !ADMIN_PASS) {
+  console.error('❌ ERROR: ADMIN_USER and ADMIN_PASS environment variables are required');
+  process.exit(1);
+}
+
+// Ruta de login
+router.post('/login', async (req, res) => {
+  try {
+    const { username, password } = req.body;
+    
+    if (!username || !password) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Usuario y contraseña son requeridos' 
+      });
+    }
+    
+    // Verificar credenciales
+    if (username === ADMIN_USER && password === ADMIN_PASS) {
+      // Crear sesión autenticada
+      req.session.authenticated = true;
+      req.session.username = username;
+      req.session.loginTime = new Date().toISOString();
+      
+      res.json({ 
+        success: true, 
+        message: 'Login exitoso',
+        user: username
+      });
+    } else {
+      res.status(401).json({ 
+        success: false, 
+        message: 'Usuario o contraseña incorrectos' 
+      });
+    }
+    
+  } catch (error) {
+    console.error('Error en login:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error interno del servidor' 
+    });
+  }
+});
+
+// Ruta de logout
+router.post('/logout', (req, res) => {
+  req.session.destroy((err) => {
+    if (err) {
+      console.error('Error cerrando sesión:', err);
+      return res.status(500).json({ 
+        success: false, 
+        message: 'Error cerrando sesión' 
+      });
+    }
+    
+    res.clearCookie('connect.sid');
+    res.json({ 
+      success: true, 
+      message: 'Sesión cerrada exitosamente' 
+    });
+  });
+});
+
+// Middleware de autenticación para las rutas protegidas
 const adminAuth = (req, res, next) => {
-  const authHeader = req.headers.authorization;
+  console.log(`🔍 Protected admin route accessed: ${req.method} ${req.path}`);
   
-  if (!authHeader) {
-    res.setHeader('WWW-Authenticate', 'Basic realm="Admin Panel"');
-    return res.status(401).send('Autenticación requerida');
+  if (!req.session.authenticated) {
+    console.log('❌ No authenticated session found');
+    return res.status(401).json({ 
+      success: false, 
+      message: 'No autorizado. Inicia sesión primero.' 
+    });
   }
   
-  const auth = Buffer.from(authHeader.split(' ')[1], 'base64').toString().split(':');
-  const user = auth[0];
-  const pass = auth[1];
-  
-  // Credenciales de admin (cambiar en producción)
-  const ADMIN_USER = process.env.ADMIN_USER || 'admin';
-  const ADMIN_PASS = process.env.ADMIN_PASS || 'KYC2025Admin!';
-  
-  if (user === ADMIN_USER && pass === ADMIN_PASS) {
-    next();
-  } else {
-    res.setHeader('WWW-Authenticate', 'Basic realm="Admin Panel"');
-    res.status(401).send('Credenciales incorrectas');
-  }
+  console.log('✅ Session authenticated, proceeding...');
+  next();
 };
 
-// Aplicar autenticación a todas las rutas admin
-router.use(adminAuth);
+// Ruta para obtener información de sesión
+router.get('/session', adminAuth, (req, res) => {
+  if (req.session.authenticated) {
+    res.json({
+      success: true,
+      authenticated: true,
+      username: req.session.username,
+      loginTime: req.session.loginTime
+    });
+  } else {
+    res.json({
+      success: false,
+      authenticated: false
+    });
+  }
+});
 
 // Migración: Agregar columna ine_ocr_enabled si no existe
-router.post('/migrate-ine-ocr', async (req, res) => {
+router.post('/migrate-ine-ocr', adminAuth, async (req, res) => {
   try {
     // Verificar si la columna ya existe
     const [columns] = await pool.query(`
@@ -61,140 +134,156 @@ router.post('/migrate-ine-ocr', async (req, res) => {
     console.error('Error en migración:', error);
     res.status(500).json({
       success: false,
-      error: error.message
+      message: 'Error ejecutando migración: ' + error.message
     });
   }
 });
 
-// Migración: Agregar columna search_limit si no existe
-router.post('/migrate-search-limits', async (req, res) => {
+// Test route para debug
+router.get('/test', adminAuth, async (req, res) => {
+  console.log('🧪 Test route accessed');
   try {
-    // Verificar si la columna ya existe
-    const [columns] = await pool.query(`
-      SHOW COLUMNS FROM authorized_users LIKE 'search_limit'
-    `);
+    const [tables] = await pool.query('SHOW TABLES');
+    console.log('📋 Tables found:', tables);
     
-    if (columns.length === 0) {
-      // Agregar la columna search_limit con valor por defecto de 100
-      await pool.query(`
-        ALTER TABLE authorized_users 
-        ADD COLUMN search_limit INT DEFAULT 100 COMMENT 'Límite diario de búsquedas (-1 = ilimitado)'
-      `);
+    if (tables.some(t => Object.values(t).includes('authorized_users'))) {
+      const [columns] = await pool.query('DESCRIBE authorized_users');
+      console.log('📋 authorized_users columns:', columns);
       
-      res.json({
-        success: true,
-        message: 'Columna search_limit agregada exitosamente'
-      });
-    } else {
-      res.json({
-        success: true,
-        message: 'La columna search_limit ya existe'
-      });
+      const [count] = await pool.query('SELECT COUNT(*) as count FROM authorized_users');
+      console.log('📊 Row count:', count[0].count);
     }
+    
+    res.json({ success: true, tables, message: 'Check server logs for details' });
   } catch (error) {
-    console.error('Error en migración:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Error al agregar columna search_limit: ' + error.message
-    });
+    console.error('❌ Test error:', error);
+    res.status(500).json({ error: error.message });
   }
 });
 
-// GET - Listar todos los usuarios
-router.get('/users', async (req, res) => {
+// Obtener todos los usuarios
+router.get('/users', adminAuth, async (req, res) => {
   try {
-    const [users] = await pool.query(
-      `SELECT 
-        id,
-        phone_number,
-        full_name,
-        company,
-        is_active,
+    console.log('📋 Obteniendo usuarios...');
+    
+    // Seleccionar todas las columnas necesarias para el panel de administración
+    const [rows] = await pool.query(`
+      SELECT 
+        id, 
+        phone_number, 
+        full_name, 
+        company, 
+        is_active, 
         search_limit,
+        total_queries, 
+        last_access, 
         ine_ocr_enabled,
         created_at,
-        last_access,
-        total_queries
+        updated_at
       FROM authorized_users 
-      ORDER BY created_at DESC`
-    );
-    res.json(users);
+      ORDER BY created_at DESC
+      LIMIT 50
+    `);
+    
+    console.log(`✅ ${rows.length} usuarios encontrados`);
+    res.json(rows);
   } catch (error) {
-    console.error('Error obteniendo usuarios:', error);
-    res.status(500).json({ error: 'Error obteniendo usuarios' });
+    console.error('❌ Error obteniendo usuarios:', error);
+    console.error('❌ Stack trace:', error.stack);
+    res.status(500).json({ 
+      error: 'Error obteniendo usuarios',
+      details: error.message,
+      stack: error.stack
+    });
   }
 });
 
-// POST - Agregar nuevo usuario
-router.post('/users', async (req, res) => {
-  const { phone_number, full_name, company, search_limit, ine_ocr_enabled } = req.body;
-  
-  if (!phone_number || !full_name) {
-    return res.status(400).json({ error: 'Número y nombre son requeridos' });
-  }
-  
-  // Limpiar número - quitar espacios y el + si existe
-  let formattedNumber = phone_number.replace(/\s+/g, '').replace(/^\+/, '');
-  
-  // Validar search_limit
-  let finalSearchLimit = search_limit || 100; // Default 100
-  if (finalSearchLimit === 'unlimited') {
-    finalSearchLimit = -1;
-  }
-  
+// Crear nuevo usuario
+router.post('/users', adminAuth, async (req, res) => {
   try {
+    const { phone_number, full_name, company, is_active, search_limit, ine_ocr_enabled } = req.body;
+    
+    if (!phone_number || !full_name) {
+      return res.status(400).json({ error: 'Teléfono y nombre son requeridos' });
+    }
+
+    // Procesar search_limit: -1 para ilimitado, o valor numérico
+    let processedSearchLimit = 100; // Default
+    if (search_limit === 'unlimited' || search_limit === -1) {
+      processedSearchLimit = -1;
+    } else if (typeof search_limit === 'number' && search_limit > 0) {
+      processedSearchLimit = search_limit;
+    } else if (typeof search_limit === 'string' && !isNaN(search_limit)) {
+      processedSearchLimit = parseInt(search_limit);
+    }
+
     const [result] = await pool.query(
-      'INSERT INTO authorized_users (phone_number, full_name, company, search_limit, ine_ocr_enabled) VALUES (?, ?, ?, ?, ?)',
-      [formattedNumber, full_name, company || null, finalSearchLimit, ine_ocr_enabled || false]
+      'INSERT INTO authorized_users (phone_number, full_name, company, is_active, search_limit, ine_ocr_enabled) VALUES (?, ?, ?, ?, ?, ?)',
+      [phone_number, full_name, company || null, is_active !== false, processedSearchLimit, ine_ocr_enabled || false]
     );
     
-    res.json({ 
-      id: result.insertId,
-      message: 'Usuario agregado exitosamente',
-      phone_number: formattedNumber 
-    });
+    res.json({ id: result.insertId, message: 'Usuario creado exitosamente' });
   } catch (error) {
+    console.error('Error creando usuario:', error);
     if (error.code === 'ER_DUP_ENTRY') {
-      res.status(400).json({ error: 'Este número ya está registrado' });
+      res.status(400).json({ error: 'El número de teléfono ya existe' });
     } else {
-      console.error('Error agregando usuario:', error);
-      res.status(500).json({ error: 'Error agregando usuario' });
+      res.status(500).json({ error: 'Error creando usuario' });
     }
   }
 });
 
-// PUT - Actualizar usuario
-router.put('/users/:id', async (req, res) => {
-  const { id } = req.params;
-  const { full_name, company, is_active, search_limit, ine_ocr_enabled } = req.body;
-  
-  // Validar search_limit
-  let finalSearchLimit = search_limit || 100;
-  if (finalSearchLimit === 'unlimited') {
-    finalSearchLimit = -1;
-  }
-  
+// Actualizar usuario
+router.put('/users/:id', adminAuth, async (req, res) => {
   try {
-    await pool.query(
-      `UPDATE authorized_users 
-       SET full_name = ?, company = ?, is_active = ?, search_limit = ?, ine_ocr_enabled = ?
-       WHERE id = ?`,
-      [full_name, company, is_active, finalSearchLimit, ine_ocr_enabled || false, id]
+    const { id } = req.params;
+    const { phone_number, full_name, company, is_active, search_limit, ine_ocr_enabled } = req.body;
+    
+    if (!phone_number || !full_name) {
+      return res.status(400).json({ error: 'Teléfono y nombre son requeridos' });
+    }
+
+    // Procesar search_limit: -1 para ilimitado, o valor numérico
+    let processedSearchLimit = 100; // Default
+    if (search_limit === 'unlimited' || search_limit === -1) {
+      processedSearchLimit = -1;
+    } else if (typeof search_limit === 'number' && search_limit > 0) {
+      processedSearchLimit = search_limit;
+    } else if (typeof search_limit === 'string' && !isNaN(search_limit)) {
+      processedSearchLimit = parseInt(search_limit);
+    }
+
+    const [result] = await pool.query(
+      'UPDATE authorized_users SET phone_number = ?, full_name = ?, company = ?, is_active = ?, search_limit = ?, ine_ocr_enabled = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      [phone_number, full_name, company || null, is_active !== false, processedSearchLimit, ine_ocr_enabled || false, id]
     );
+    
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
     
     res.json({ message: 'Usuario actualizado exitosamente' });
   } catch (error) {
     console.error('Error actualizando usuario:', error);
-    res.status(500).json({ error: 'Error actualizando usuario' });
+    if (error.code === 'ER_DUP_ENTRY') {
+      res.status(400).json({ error: 'El número de teléfono ya existe' });
+    } else {
+      res.status(500).json({ error: 'Error actualizando usuario' });
+    }
   }
 });
 
-// DELETE - Eliminar usuario
-router.delete('/users/:id', async (req, res) => {
-  const { id } = req.params;
-  
+// Eliminar usuario
+router.delete('/users/:id', adminAuth, async (req, res) => {
   try {
-    await pool.query('DELETE FROM authorized_users WHERE id = ?', [id]);
+    const { id } = req.params;
+    
+    const [result] = await pool.query('DELETE FROM authorized_users WHERE id = ?', [id]);
+    
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+    
     res.json({ message: 'Usuario eliminado exitosamente' });
   } catch (error) {
     console.error('Error eliminando usuario:', error);
@@ -202,101 +291,24 @@ router.delete('/users/:id', async (req, res) => {
   }
 });
 
-// GET - Diagnóstico temporal (ELIMINAR EN PRODUCCIÓN DESPUÉS DE USAR)
-router.get('/diagnostic', async (req, res) => {
+// Obtener estadísticas
+router.get('/stats', adminAuth, async (req, res) => {
   try {
-    const diagnosticInfo = {
-      kycApiUrl: process.env.KYC_API_URL || 'NO CONFIGURADA',
-      kycApiKeyPresent: !!process.env.KYC_API_KEY,
-      serverUrl: process.env.SERVER_URL || 'NO CONFIGURADA',
-      twilioConfigured: !!(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN),
-      nodeEnv: process.env.NODE_ENV || 'development',
-      timestamp: new Date().toISOString()
-    };
-    
-    // Verificar conectividad con la API KYC
-    try {
-      const axios = require('axios');
-      // Hacer una búsqueda de prueba simple para verificar la conectividad
-      const testResponse = await axios.post(`${process.env.KYC_API_URL}/search`, {
-        persona: "2",
-        nombre: "TEST CONNECTION",
-        porcentaje_min: 98
-      }, {
-        headers: {
-          "Content-Type": "application/json",
-          "X-API-Key": process.env.KYC_API_KEY,
-        },
-        timeout: 5000
-      });
-      diagnosticInfo.kycApiStatus = 'CONECTADO';
-      diagnosticInfo.kycApiResponse = 'API funcional';
-    } catch (error) {
-      diagnosticInfo.kycApiStatus = 'ERROR';
-      diagnosticInfo.kycApiError = error.message;
-      if (error.response) {
-        diagnosticInfo.kycApiStatusCode = error.response.status;
-        diagnosticInfo.kycApiResponseData = error.response.data;
-      }
-    }
-    
-    res.json(diagnosticInfo);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// GET - Estadísticas
-router.get('/stats', async (req, res) => {
-  try {
-    const [totalUsers] = await pool.query(
-      'SELECT COUNT(*) as total FROM authorized_users WHERE is_active = true'
-    );
-    
-    const [activeToday] = await pool.query(
-      `SELECT COUNT(*) as total FROM authorized_users 
-       WHERE last_access >= DATE_SUB(NOW(), INTERVAL 24 HOUR)`
-    );
-    
-    const [totalQueries] = await pool.query(
-      'SELECT SUM(total_queries) as total FROM authorized_users'
-    );
-    
-    const [blockedAttempts] = await pool.query(
-      `SELECT COUNT(*) as total FROM blocked_attempts 
-       WHERE attempt_time >= DATE_SUB(NOW(), INTERVAL 24 HOUR)`
+    const [totalUsers] = await pool.query('SELECT COUNT(*) as total FROM authorized_users');
+    const [activeUsers] = await pool.query('SELECT COUNT(*) as active FROM authorized_users WHERE is_active = 1');
+    const [recentUsers] = await pool.query(
+      'SELECT COUNT(*) as recent FROM authorized_users WHERE created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)'
     );
     
     res.json({
       totalUsers: totalUsers[0].total,
-      activeToday: activeToday[0].total,
-      totalQueries: totalQueries[0].total || 0,
-      blockedToday: blockedAttempts[0].total
+      activeUsers: activeUsers[0].active,
+      recentUsers: recentUsers[0].recent,
+      inactiveUsers: totalUsers[0].total - activeUsers[0].active
     });
   } catch (error) {
     console.error('Error obteniendo estadísticas:', error);
     res.status(500).json({ error: 'Error obteniendo estadísticas' });
-  }
-});
-
-// GET - Intentos bloqueados
-router.get('/blocked', async (req, res) => {
-  try {
-    const [attempts] = await pool.query(
-      `SELECT 
-        phone_number,
-        COUNT(*) as attempts,
-        MAX(attempt_time) as last_attempt
-      FROM blocked_attempts 
-      WHERE attempt_time >= DATE_SUB(NOW(), INTERVAL 7 DAY)
-      GROUP BY phone_number
-      ORDER BY attempts DESC
-      LIMIT 50`
-    );
-    res.json(attempts);
-  } catch (error) {
-    console.error('Error obteniendo intentos bloqueados:', error);
-    res.status(500).json({ error: 'Error obteniendo intentos bloqueados' });
   }
 });
 
