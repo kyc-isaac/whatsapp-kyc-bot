@@ -1099,6 +1099,7 @@
 
         <div class="main-panel">
             <!-- Tabs -->
+            <p><a href="/admin/operations.html" class="btn btn-primary">Estado del servicio, mensajes y administradores</a></p>
             <div class="tabs">
                 <button class="tab-btn active" onclick="showTab('users')">
                     <span>👥</span>
@@ -1314,8 +1315,10 @@
         </div>
     </div>
 
+    <script src="/admin/admin-client.js"></script>
     <script>
         let users = [];
+        let usersPage = 1, usersPages = 1, usersRequest = 0, searchTimer;
         const API_BASE = '/api/admin';
         
         // Verificar sesión y cargar información de usuario
@@ -1400,18 +1403,34 @@
             }
         }
 
-        async function loadUsers() {
+        async function loadUsers(page = usersPage) {
+            const requestId = ++usersRequest;
             try {
-                const response = await fetch(`${API_BASE}/users`);
+                const q = document.getElementById('searchBox').value.trim();
+                const response = await fetch(`${API_BASE}/users?${new URLSearchParams({ page, pageSize: 25, q })}`);
                 if (!response.ok) throw new Error('Error al cargar usuarios');
-                
-                users = await response.json();
+                const data = await response.json();
+                if (requestId !== usersRequest) return;
+                if (data.pages && page > data.pages) return loadUsers(data.pages);
+                users = data.users;
+                usersPage = data.page;
+                usersPages = Math.max(1, data.pages);
                 renderUsers(users);
-                showMessage('Usuarios cargados exitosamente', 'success');
-            } catch (error) {
-                console.error('Error:', error);
-                showMessage('Error al cargar usuarios', 'error');
-            }
+                let pagination = document.getElementById('userPagination');
+                if (!pagination) {
+                    pagination = document.createElement('div');
+                    pagination.id = 'userPagination';
+                    pagination.style.cssText = 'display:flex;gap:16px;align-items:center;padding:20px';
+                    document.getElementById('content').after(pagination);
+                }
+                pagination.innerHTML = `<button class="btn" onclick="loadUsers(usersPage-1)" ${usersPage <= 1 ? 'disabled' : ''}>Anterior</button><span>Página ${usersPage} de ${usersPages} · ${data.total} usuarios</span><button class="btn" onclick="loadUsers(usersPage+1)" ${usersPage >= usersPages ? 'disabled' : ''}>Siguiente</button>`;
+            } catch (error) { showMessage('No se pudieron cargar los usuarios', 'error'); }
+        }
+
+        function escapeHtml(value) {
+            return String(value ?? '').replace(/[&<>"']/g, char => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+            }[char]));
         }
 
         function renderUsers(usersToRender) {
@@ -1454,6 +1473,7 @@
             `;
 
             usersToRender.forEach(user => {
+                user = { ...user, phone_number: escapeHtml(user.phone_number), full_name: escapeHtml(user.full_name), company: escapeHtml(user.company) };
                 const lastAccess = user.last_access ? 
                     new Date(user.last_access).toLocaleString('es-ES', {
                         day: '2-digit',
@@ -1509,13 +1529,8 @@
         }
 
         function filterUsers() {
-            const search = document.getElementById('searchBox').value.toLowerCase();
-            const filtered = users.filter(user => 
-                user.full_name.toLowerCase().includes(search) ||
-                user.phone_number.includes(search) ||
-                (user.company && user.company.toLowerCase().includes(search))
-            );
-            renderUsers(filtered);
+            clearTimeout(searchTimer);
+            searchTimer = setTimeout(() => loadUsers(1), 300);
         }
 
         function showAddModal() {
@@ -1816,7 +1831,7 @@
                     '<span class="status-badge status-inactive">Inactivo</span>';
 
                 if (!isUnlimited) {
-                    const percentage = Math.min((user.todaySearches / user.dailyLimit) * 100, 100);
+                    const percentage = user.dailyLimit === 0 ? 100 : Math.min((user.todaySearches / user.dailyLimit) * 100, 100);
                     const progressClass = percentage >= 90 ? 'danger' : percentage >= 70 ? 'warning' : '';
                     
                     progressHtml = `

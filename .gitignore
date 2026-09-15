@@ -26,3 +26,9 @@ Thumbs.db
 SETUP_DOCUMENTATION.md
 
 WHATSAPP_BUSINESS_PRODUCTION_COMPLETE.md
+# Almacenamiento privado y archivos de sesiones locales
+private/
+cookies.txt
+new_cookies.txt
+.env.*
+!.env.example

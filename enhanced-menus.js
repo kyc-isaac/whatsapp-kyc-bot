@@ -1,572 +1,83 @@
-// Menús Mejorados con Formato y Emojis para WhatsApp
-// Opción A - Implementación inmediata sin necesidad de API especial
+const { version } = require('./package.json');
+const SUPPORT = '📧 hola@kyc-systems.com\n📞 +52 55 4762 6178';
+const NAV = '\n\n*menu* · Inicio    *ayuda* · Ayuda';
 
-/**
- * Menú Principal Mejorado
- */
 function getEnhancedMainMenu(userName, companyName) {
-  return `🔐 *KYC SYSTEMS*
-━━━━━━━━━━━━━━━━━━
-
-¡Hola *${userName}*! 👋
-
-Bienvenido al Sistema *KYC LISTAS*
-🏢 _${companyName}_
-
-¿Qué deseas hacer hoy?
-
-1️⃣ 🔎 *Buscar en Listas*
-      _Consulta múltiples listas oficiales_
-
-2️⃣ 📋 *Búsquedas Recientes*
-      _Últimas 10 consultas_
-
-3️⃣ ℹ️ *Ayuda y Soporte*
-      _Guías y contacto_
-
-━━━━━━━━━━━━━━━━━━
-_Responde con el número de tu elección_`;
+  return `🔎 *KYC SYSTEMS*\n\nHola, *${userName || 'Usuario'}*.${companyName ? `\n${companyName}` : ''}\n\n1️⃣ Buscar en listas\n2️⃣ Consultas recientes\n3️⃣ Ayuda y contacto\n4️⃣ Mi cuenta y porcentaje\n\nResponde con el número de una opción.${NAV}`;
 }
-
-/**
- * Menú de Tipo de Búsqueda (Dinámico según permisos del usuario)
- */
-function getSearchTypeMenu(hasIneOcrPermission = false) {
-  let menu = `🔍 *BÚSQUEDA POR TIPO*
-━━━━━━━━━━━━━━━━━━
-
-1️⃣ 👤 *Persona Física* (Nombres separados)
-2️⃣ 👤 *Persona Física* (Nombre completo)  
-3️⃣ 🏢 *Persona Moral*`;
-
-  // Agregar opción INE OCR si el usuario tiene permiso
-  if (hasIneOcrPermission) {
-    menu += `
-4️⃣ 📷 *Búsqueda con INE*
-      _Envía fotos de tu credencial_`;
-  }
-
-  menu += `
-
-━━━━━━━━━━━━━━━━━━
-💡 Búsquedas con 98% de coincidencia (recomendado)
-📊 Para cambiar %, escribe: P seguido del número
-    Ejemplo: P85 para 85%
-    
-↩️ Escribe *0* para volver al menú principal`;
-
-  return menu;
+function getSearchTypeMenu(hasIneOcrPermission = false, percentage = 98) {
+  return `🔍 *Nueva consulta*\n\n1️⃣ Persona · nombre y apellidos por separado\n2️⃣ Persona · nombre completo\n3️⃣ Empresa · razón social${hasIneOcrPermission ? '\n4️⃣ Persona · leer una INE' : ''}\n\nSimilitud mínima: *${percentage}%*\nPara cambiarla, escribe *P85*, por ejemplo (70–100).\n\n*0* · Volver al inicio${NAV}`;
 }
-
-/**
- * Información de Listas Disponibles
- */
 function getListsInfo() {
-  return `📚 *Listas de Compliance Disponibles*
-━━━━━━━━━━━━━━━━━━
-
-Tu búsqueda incluirá automáticamente:
-
-👔 *PEP's*
-_Personas Expuestas Políticamente_
-Funcionarios y familiares
-
-🇲🇽 *SAT 69-B*
-_Servicio de Administración Tributaria_
-Operaciones inexistentes
-
-🚫 *LPB*
-_Lista de Personas Bloqueadas_
-Lavado de dinero y terrorismo
-
-🇺🇸 *OFAC*
-_Office of Foreign Assets Control_
-Sanciones económicas y comerciales
-
-🌐 *ONU*
-_Organización de las Naciones Unidas_
-Lista de sanciones internacionales
-
-🔍 *INTERPOL*
-_Organización Internacional de Policía Criminal_
-Base de datos internacional
-
-🕵️ *FBI*
-_Federal Bureau of Investigation_
-Más buscados y criminales
-
-_Y más listas de compliance..._
-
-━━━━━━━━━━━━━━━━━━
-✅ Búsqueda en *múltiples listas simultáneas*
-⚡ Resultados en *segundos*`;
+  return '📋 *Listas consultadas*\n\nLa consulta se envía al servicio KYC LISTAS. La cobertura depende de las fuentes disponibles en ese servicio.\n\nRevisa en el resultado y en el PDF la fuente de cada coincidencia. Una coincidencia por nombre necesita revisión para determinar si corresponde a la persona consultada.';
 }
-
-/**
- * Confirmación de Datos con Formato Visual
- */
-function getConfirmationMessage(searchData) {
-  const tipo = searchData.tipo === 'persona' ? '👤 Persona Física' : '🏢 Empresa';
-  
-  let datosStr = '';
-  if (searchData.tipo === 'persona') {
-    datosStr = `*Nombre:* ${searchData.nombre}
-*Apellido Paterno:* ${searchData.apellidoPaterno}
-*Apellido Materno:* ${searchData.apellidoMaterno || 'N/A'}`;
-  } else {
-    datosStr = `*Razón Social:* ${searchData.nombre}`;
-  }
-
-  const porcentaje = searchData.porcentaje_min || 98;
-  const esRecomendado = porcentaje === 98 ? ' _(recomendado)_' : '';
-
-  return `✅ *Confirmar Datos de Búsqueda*
-━━━━━━━━━━━━━━━━━━
-
-*Tipo:* ${tipo}
-
-${datosStr}
-
-*Configuración:*
-• 📊 Porcentaje coincidencia: *${porcentaje}%*${esRecomendado}
-• 📋 Listas a consultar: *Todas las disponibles*
-• ⏱️ Tiempo estimado: *Pocos segundos*
-
-━━━━━━━━━━━━━━━━━━
-¿Los datos son correctos?
-
-1️⃣ ✅ *Sí, buscar ahora*
-2️⃣ ✏️ *Modificar datos*
-3️⃣ ❌ *Cancelar búsqueda*`;
+function getConfirmationMessage(data) {
+  const name = [data.nombre, data.apaterno, data.amaterno].filter(Boolean).join(' ');
+  return `📝 *Revisa tu consulta*\n\n*Tipo:* ${data.kind === 'company' ? 'Empresa' : 'Persona física'}\n*${data.kind === 'company' ? 'Razón social' : 'Nombre'}:* ${name}\n*Similitud mínima:* ${data.porcentaje_min}%\n\n1️⃣ Confirmar y buscar\n2️⃣ Corregir datos\n3️⃣ Cancelar\n\nLa búsqueda comienza cuando confirmes.${NAV}`;
 }
-
-/**
- * Estado de Procesamiento Animado
- */
-function getProcessingStatus(step = 1) {
-  const steps = [
-    {
-      text: '🔄 *Procesando búsqueda...*\n\n⏳ Iniciando consulta en bases de datos...',
-      details: `
-⬜ PEP's - Pendiente
-⬜ SAT 69-B - Pendiente
-⬜ LPB - Pendiente
-⬜ OFAC - Pendiente
-⬜ ONU - Pendiente
-⬜ INTERPOL - Pendiente
-⬜ FBI - Pendiente`
-    },
-    {
-      text: '🔄 *Procesando búsqueda...*\n\n⚡ Consultando listas nacionales...',
-      details: `
-✅ PEP's - Completado
-✅ SAT 69-B - Completado
-⏳ LPB - En proceso...
-⬜ OFAC - Pendiente
-⬜ ONU - Pendiente
-⬜ INTERPOL - Pendiente
-⬜ FBI - Pendiente`
-    },
-    {
-      text: '🔄 *Procesando búsqueda...*\n\n🌐 Consultando listas internacionales...',
-      details: `
-✅ PEP's - Completado
-✅ SAT 69-B - Completado
-✅ LPB - Completado
-✅ OFAC - Completado
-⏳ ONU - En proceso...
-⏳ INTERPOL - En proceso...
-⬜ FBI - Pendiente`
-    },
-    {
-      text: '🔄 *Finalizando búsqueda...*\n\n📄 Generando reporte...',
-      details: `
-✅ PEP's - Completado
-✅ SAT 69-B - Completado
-✅ LPB - Completado
-✅ OFAC - Completado
-✅ ONU - Completado
-✅ INTERPOL - Completado
-✅ FBI - Completado
-_Y más listas..._`
-    }
-  ];
-
-  const current = steps[Math.min(step - 1, steps.length - 1)];
-  
-  return `${current.text}
-━━━━━━━━━━━━━━━━━━
-*Estado de Listas:*${current.details}
-
-━━━━━━━━━━━━━━━━━━
-_Por favor espera, no envíes mensajes..._`;
+function getProcessingStatus() {
+  return '🔎 *Consultando KYC LISTAS…*\n\nTe enviaré el resultado al terminar. La consulta puede tardar unos segundos.';
 }
-
-/**
- * Resultados con Formato Visual
- */
-function getResultsMessage(results) {
-  const hasMatches = results.coincidences > 0;
-  const statusEmoji = hasMatches ? '⚠️' : '✅';
-  const statusText = hasMatches ? 'COINCIDENCIAS ENCONTRADAS' : 'SIN COINCIDENCIAS';
-  
-  let matchDetails = '';
-  if (hasMatches) {
-    matchDetails = `
-*📊 Detalle de Coincidencias:*
-${results.matches ? results.matches.map(m => 
-  `• ${m.lista}: ${m.porcentaje}% coincidencia`
-).join('\n') : '• Ver PDF para detalles completos'}`;
-  }
-
-  return `${statusEmoji} *Resultados de Búsqueda KYC*
-━━━━━━━━━━━━━━━━━━
-
-*Estado:* ${statusText}
-*Coincidencias:* ${results.coincidences || 0}
-*Listas consultadas:* Todas las disponibles
-*Tiempo de búsqueda:* ${results.searchTime || '3.2'}s
-
-${matchDetails}
-
-*📄 Reporte Generado*
-• Formato: PDF
-• Páginas: ${results.pages || 1}
-• Validez: 24 horas
-• ID: ${results.reportId || 'KYC-' + Date.now()}
-
-━━━━━━━━━━━━━━━━━━
-¿Qué deseas hacer?
-
-1️⃣ 📥 *Descargar PDF*
-2️⃣ 📤 *Compartir Reporte*
-3️⃣ 🔎 *Nueva Búsqueda*
-4️⃣ 🏠 *Menú Principal*`;
+function getResultsMessage(result) {
+  const details = (result.matches || []).map(m => `• ${m.lista || 'Fuente sin especificar'}${m.porcentaje != null ? ` · ${m.porcentaje}%` : ''}`).join('\n');
+  return `${result.coincidences > 0 ? '⚠️' : '✅'} *Resultado de consulta*\n\n*Nombre:* ${result.name}\n*Coincidencias:* ${result.coincidences}\n*Similitud mínima:* ${result.percentage}%${Number.isFinite(result.elapsedMs) ? `\n*Tiempo:* ${(result.elapsedMs / 1000).toFixed(1)} s` : ''}\n${details ? `\n${details}\n` : ''}\n${result.coincidences > 0 ? 'Revisa las coincidencias y sus fuentes antes de tomar una decisión.' : 'No se encontraron coincidencias con los datos y el porcentaje utilizados. Esto no constituye una certificación.'}\n\n${result.pdfUrl ? '📄 PDF disponible mediante el enlace durante 24 horas.' : '📄 No hay PDF disponible para esta consulta.'}\n\n1️⃣ Obtener PDF\n2️⃣ Cómo compartir el reporte\n3️⃣ Nueva consulta\n4️⃣ Menú principal`;
 }
-
-/**
- * Menú de Ayuda Mejorado
- */
 function getHelpMenu() {
-  return `ℹ️ *Centro de Ayuda*
-━━━━━━━━━━━━━━━━━━
-
-*PREGUNTAS FRECUENTES*
-
-1️⃣ 📋 *Sobre las Listas*
-      _Qué incluye cada lista_
-
-2️⃣ 🔍 *Cómo Buscar*
-      _Guía paso a paso_
-
-3️⃣ 📊 *Interpretar Resultados*
-      _Entender porcentajes_
-
-*SOPORTE TÉCNICO*
-
-4️⃣ 💬 *Chat con Soporte*
-      _Agente en línea_
-
-5️⃣ 📧 *Enviar Email*
-      _hola@kyc-systems.com_
-
-6️⃣ 📞 *Llamar*
-      _+52 55 4762 6178_
-
-*INFORMACIÓN*
-
-7️⃣ 📖 *Manual de Usuario*
-8️⃣ 🔐 *Política de Privacidad*
-9️⃣ ℹ️ *Versión del Sistema*
-
-━━━━━━━━━━━━━━━━━━
-↩️ Escribe *0* para volver`;
+  return 'ℹ️ *Ayuda y contacto*\n\n1️⃣ Listas y cobertura\n2️⃣ Cómo hacer una consulta\n3️⃣ Cómo interpretar el resultado\n4️⃣ Contactar a soporte\n5️⃣ Reportar un problema por correo\n6️⃣ Teléfono de contacto\n7️⃣ Guía de comandos\n8️⃣ Uso de datos y reportes\n9️⃣ Acerca del bot\n\n*0* · Menú principal';
 }
-
-/**
- * Mensaje de Error Amigable
- */
-function getErrorMessage(errorType = 'generic') {
-  const errorMessages = {
-    'timeout': {
-      emoji: '⏱️',
-      title: 'Tiempo de Espera Agotado',
-      message: 'La búsqueda tardó más de lo esperado.',
-      suggestion: 'Por favor intenta nuevamente en unos momentos.'
-    },
-    'api_error': {
-      emoji: '⚠️',
-      title: 'Servicio Temporalmente No Disponible',
-      message: 'Estamos experimentando problemas técnicos.',
-      suggestion: 'Intenta de nuevo en 5 minutos.'
-    },
-    'invalid_input': {
-      emoji: '❌',
-      title: 'Datos Inválidos',
-      message: 'Los datos ingresados no son válidos.',
-      suggestion: 'Verifica la información e intenta nuevamente.'
-    },
-    'no_authorization': {
-      emoji: '🔒',
-      title: 'Acceso No Autorizado',
-      message: 'No tienes permisos para esta acción.',
-      suggestion: 'Contacta al administrador.'
-    },
-    'generic': {
-      emoji: '😔',
-      title: 'Algo Salió Mal',
-      message: 'Ocurrió un error inesperado.',
-      suggestion: 'Nuestro equipo ha sido notificado.'
-    }
+function getHelpDetail(option) {
+  const details = {
+    '1': getListsInfo(),
+    '2': '🔍 *Cómo consultar*\n\n1. Escribe *buscar*.\n2. Elige persona o empresa.\n3. Captura los datos o envía ambas caras de una INE si tienes permiso.\n4. Revisa el nombre y el porcentaje.\n5. Responde *1* para confirmar.\n6. Revisa el resultado y descarga el PDF si está disponible.',
+    '3': '📊 *Interpretar resultados*\n\nEl porcentaje mide similitud del nombre, no probabilidad de riesgo ni certeza de identidad. Un umbral menor puede mostrar más registros. Revisa nombres, fuentes y otros identificadores. Cero coincidencias solo describe esta consulta y su cobertura.',
+    '4': `💬 *Contacto con soporte*\n\n${SUPPORT}\n\nEste bot muestra los datos de contacto; no transfiere la conversación a un agente.`,
+    '5': '📧 *Reportar un problema*\n\nEscribe a hola@kyc-systems.com con la hora aproximada, la opción utilizada y una descripción del problema. No incluyas contraseñas ni credenciales de acceso.',
+    '6': '📞 *Contacto telefónico*\n\n+52 55 4762 6178',
+    '7': '⌨️ *Comandos*\n\n*menu* o *inicio*: volver al inicio.\n*buscar*: iniciar una consulta.\n*ayuda*: abrir la ayuda.\n*atras* o *0*: volver al paso anterior.\n*cancelar*: descartar la captura.\n*P85*: cambiar la similitud mínima (70–100).\n*omitir* o *skip*: dejar vacío un apellido.\n\nDurante una consulta en curso espera el resultado antes de cambiar de opción.',
+    '8': '🔐 *Datos y reportes*\n\nLos datos de consulta se envían a los proveedores KYC y los mensajes pasan por WhatsApp/Twilio. Las fotos de INE se usan para leer el nombre y se liberan de la sesión al terminar esa lectura.\n\nEl historial y las sesiones se guardan cifrados en el servidor; puedes recuperar tus últimas 10 consultas aunque el bot se reinicie. El administrador establece el plazo de conservación. Los PDF se almacenan cifrados y sus enlaces vencen a las 24 horas o al revocarlos. Quien tenga un enlace vigente puede descargar el archivo.\n\nPara conocer las políticas de los proveedores, contacta al administrador.',
+    '9': `ℹ️ *KYC SYSTEMS · Bot ${version}*\n\nConsultas por nombre, empresas, lectura de INE según permisos y reportes PDF cuando el servicio los incluye.`
   };
-
-  const error = errorMessages[errorType] || errorMessages.generic;
-
-  return `${error.emoji} *${error.title}*
-━━━━━━━━━━━━━━━━━━
-
-${error.message}
-
-💡 *Sugerencia:*
-_${error.suggestion}_
-
-━━━━━━━━━━━━━━━━━━
-¿Qué deseas hacer?
-
-1️⃣ 🔄 *Reintentar*
-2️⃣ 🏠 *Menú Principal*
-3️⃣ 💬 *Contactar Soporte*`;
+  return details[option] ? `${details[option]}\n\n*0* · Volver a ayuda${NAV}` : null;
 }
-
-/**
- * Mensaje de Bienvenida Inicial
- */
-function getWelcomeMessage(userName, companyName, isFirstTime = false) {
-  if (isFirstTime) {
-    return `🎉 *¡Bienvenido al Sistema KYC!*
-━━━━━━━━━━━━━━━━━━
-
-Hola *${userName}* 👋
-
-Es tu primera vez usando el sistema.
-Te guiaré paso a paso.
-
-*Tu empresa:* ${companyName}
-*Acceso:* ✅ Autorizado
-*Búsquedas disponibles:* Ilimitadas
-
-━━━━━━━━━━━━━━━━━━
-💡 *Tips Rápidos:*
-
-• Responde con números (1️⃣, 2️⃣, 3️⃣)
-• Escribe *menu* en cualquier momento
-• Escribe *ayuda* si necesitas soporte
-• Las sesiones duran 6 horas
-
-━━━━━━━━━━━━━━━━━━
-_Escribe *1* para continuar al menú principal_`;
-  } else {
-    return getEnhancedMainMenu(userName, companyName);
-  }
+function getErrorMessage() {
+  return `⚠️ *No se pudo completar la consulta*\n\n1️⃣ Reintentar con los mismos datos\n2️⃣ Menú principal\n3️⃣ Contactar a soporte${NAV}`;
 }
-
-/**
- * Notificación de Sesión Expirada
- */
+function getWelcomeMessage(userName, companyName) {
+  return getEnhancedMainMenu(userName, companyName);
+}
 function getSessionExpiredMessage() {
-  return `⏰ *Sesión Expirada*
-━━━━━━━━━━━━━━━━━━
-
-Tu sesión ha expirado por inactividad.
-
-*Duración máxima:* 6 horas
-*Última actividad:* Hace más de 6 horas
-
-Para continuar, escribe *"Hola"* o cualquier mensaje para iniciar una nueva sesión.
-
-━━━━━━━━━━━━━━━━━━
-💡 _Tip: Guarda tus reportes importantes antes de que expire la sesión._`;
+  return '⏰ La sesión anterior venció después de 6 horas de inactividad. Inicia una nueva consulta desde el menú.';
 }
-
-/**
- * Búsquedas Recientes
- */
-function getRecentSearches(searches) {
-  if (!searches || searches.length === 0) {
-    return `📋 *Búsquedas Recientes*
-━━━━━━━━━━━━━━━━━━
-
-No tienes búsquedas recientes.
-
-━━━━━━━━━━━━━━━━━━
-1️⃣ 🔎 *Nueva Búsqueda*
-2️⃣ 🏠 *Menú Principal*`;
-  }
-
-  const searchList = searches.slice(0, 10).map((search, index) => {
-    const icon = search.coincidences > 0 ? '⚠️' : '✅';
-    const date = new Date(search.date).toLocaleDateString();
-    return `${index + 1}. ${icon} *${search.name}*
-   _${date} - ${search.coincidences} coincidencias_`;
-  }).join('\n\n');
-
-  return `📋 *Búsquedas Recientes*
-━━━━━━━━━━━━━━━━━━
-_Últimas 10 consultas_
-
-${searchList}
-
-━━━━━━━━━━━━━━━━━━
-Selecciona un número para ver detalles
-↩️ Escribe *0* para volver`;
+function getRecentSearches(searches = []) {
+  const list = searches.map((s, i) => `${i + 1}. *${s.name.length > 64 ? s.name.slice(0, 61) + '…' : s.name}*\n   ${new Date(s.date).toLocaleString('es-MX', { timeZone: 'America/Mexico_City' })} · ${s.coincidences} coincidencias`).join('\n\n');
+  return `📋 *Consultas recientes*\n\n${list || 'Todavía no has completado consultas recientes.'}\n\n${list ? 'Responde con el número para abrir el resultado.\n' : ''}*buscar* · Nueva consulta\n*0* · Menú principal\n\nAquí se muestran tus últimas 10 consultas guardadas.`;
 }
-
-/**
- * Estadísticas del Usuario
- */
 function getUserStats(stats) {
-  return `📊 *Tus Estadísticas*
-━━━━━━━━━━━━━━━━━━
-
-*Usuario:* ${stats.userName}
-*Empresa:* ${stats.company}
-*Miembro desde:* ${stats.memberSince}
-
-*📈 Resumen de Actividad:*
-• Total búsquedas: *${stats.totalSearches}*
-• Este mes: *${stats.monthlySearches}*
-• Hoy: *${stats.todaySearches}*
-
-*🎯 Tipos de Búsqueda:*
-• Personas: *${stats.personSearches}*
-• Empresas: *${stats.companySearches}*
-
-*⚠️ Coincidencias Encontradas:*
-• Total: *${stats.totalMatches}*
-• Promedio: *${stats.avgMatches}%*
-
-━━━━━━━━━━━━━━━━━━
-1️⃣ 📥 *Descargar Reporte*
-2️⃣ 🏠 *Menú Principal*`;
+  return `⚙️ *Mi cuenta y porcentaje*\n\n*Usuario:* ${stats.userName}\n*Límite diario:* ${stats.max === -1 ? 'Sin límite' : stats.max}\n*Consultas usadas o reservadas hoy:* ${stats.current}\n*Lectura de INE:* ${stats.ocr ? 'Habilitada' : 'No habilitada'}\n*Similitud mínima:* ${stats.percentage}%\n\nEscribe *P85* para usar 85% (admite 70–100).\nEl contador usa el día de CDMX y conserva el consumo después de reiniciar el servicio.\n\n*0* · Menú principal${NAV}`;
 }
-
-/**
- * Mensaje de Límite de Búsquedas Alcanzado
- */
-function getSearchLimitMessage(currentSearches, maxSearches, resetTime) {
-  return `🚫 *Límite de Búsquedas Alcanzado*
-━━━━━━━━━━━━━━━━━━
-
-Has alcanzado tu límite diario de búsquedas.
-
-*Estado actual:*
-• Búsquedas realizadas: *${currentSearches}/${maxSearches}*
-• Límite diario: *${maxSearches} búsquedas*
-• Se restablece: *${resetTime}*
-
-*¿Necesitas más búsquedas?*
-
-💬 Contacta a nuestro equipo de soporte:
-
-📧 *Email:* hola@kyc-systems.com
-📞 *Teléfono:* +52 55 4762 6178
-
-Ellos podrán ayudarte a:
-• Aumentar tu límite diario
-• Revisar tu plan actual
-• Configurar un plan personalizado
-
-━━━━━━━━━━━━━━━━━━
-1️⃣ 💬 *Contactar Soporte*
-2️⃣ 🏠 *Menú Principal*`;
+function getSearchLimitMessage(current, max) {
+  return `⏸️ *Límite diario alcanzado*\n\nConsultas: *${current}/${max}*. El día de consulta cambia a medianoche de CDMX.\n\n1️⃣ Contactar a soporte\n2️⃣ Menú principal${NAV}`;
 }
-
-/**
- * Mensajes para Búsqueda con INE OCR
- */
 function getIneStep1Message() {
-  return `📷 *BÚSQUEDA CON INE - PASO 1/2*
-━━━━━━━━━━━━━━━━━━
-
-📸 Por favor envía una foto clara del *FRENTE* de tu INE
-
-✅ *Asegúrate que:*
-• La foto sea legible
-• No tenga reflejos
-• Se vea completa la credencial
-• Esté bien iluminada
-
-⏳ Esperando foto frontal...
-
-━━━━━━━━━━━━━━━━━━
-↩️ Escribe *menu* para cancelar`;
+  return `📷 *INE · Frente (1/2)*\n\nEnvía una foto completa y legible del frente de la INE, sin reflejos. Después pediré el reverso y podrás revisar el nombre antes de buscar.\n\n*0* · Tipo de consulta${NAV}`;
 }
-
 function getIneStep2Message() {
-  return `📷 *BÚSQUEDA CON INE - PASO 2/2*
-━━━━━━━━━━━━━━━━━━
-
-✅ Foto frontal recibida
-
-📸 Ahora envía una foto clara del *REVERSO* de tu INE
-
-⏳ Esperando foto reverso...
-
-━━━━━━━━━━━━━━━━━━
-↩️ Escribe *menu* para cancelar`;
+  return `📷 *INE · Reverso (2/2)*\n\nFrente recibido. Envía una foto completa y legible del reverso.\n\n*0* · Repetir foto frontal${NAV}`;
 }
-
 function getIneProcessingMessage() {
-  return `🔍 *PROCESANDO INE...*
-━━━━━━━━━━━━━━━━━━
-
-📷 Leyendo información de la credencial...
-🔎 Realizando búsqueda automática...
-
-⏳ Por favor espera, puede tomar hasta 30 segundos...`;
+  return '📷 *Leyendo la INE…*\n\nAl terminar te mostraré el nombre para que lo confirmes.';
 }
-
 function getIneErrorMessage() {
-  return `❌ *ERROR EN LECTURA DE INE*
-━━━━━━━━━━━━━━━━━━
-
-No se pudo leer la información de tu INE.
-
-*Posibles causas:*
-• Foto borrosa o con reflejos
-• Credencial dañada o ilegible
-• Formato no compatible
-
-🔄 *¿Deseas intentar de nuevo?*
-1️⃣ Sí, reintentar
-2️⃣ No, volver al menú
-
-━━━━━━━━━━━━━━━━━━`;
+  return `⚠️ *No se pudo leer un nombre válido de la INE*\n\n1️⃣ Repetir las fotos\n2️⃣ Capturar el nombre manualmente\n3️⃣ Menú principal${NAV}`;
 }
-
 function getPercentageUpdateMessage(percentage) {
-  return `✅ *Porcentaje actualizado a ${percentage}%*
-
-Ahora selecciona el tipo de búsqueda (1-3)`;
+  return `✅ Similitud mínima: *${percentage}%*. Se conservará para tus próximas consultas de esta sesión.`;
 }
-
 module.exports = {
-  getEnhancedMainMenu,
-  getSearchTypeMenu,
-  getListsInfo,
-  getConfirmationMessage,
-  getProcessingStatus,
-  getResultsMessage,
-  getHelpMenu,
-  getErrorMessage,
-  getWelcomeMessage,
-  getSessionExpiredMessage,
-  getRecentSearches,
-  getUserStats,
-  getSearchLimitMessage,
-  getIneStep1Message,
-  getIneStep2Message,
-  getIneProcessingMessage,
-  getIneErrorMessage,
+  getEnhancedMainMenu, getSearchTypeMenu, getListsInfo, getConfirmationMessage,
+  getProcessingStatus, getResultsMessage, getHelpMenu, getHelpDetail,
+  getErrorMessage, getWelcomeMessage, getSessionExpiredMessage,
+  getRecentSearches, getUserStats, getSearchLimitMessage, getIneStep1Message,
+  getIneStep2Message, getIneProcessingMessage, getIneErrorMessage,
   getPercentageUpdateMessage
 };

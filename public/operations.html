@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Operación del bot · KYC SYSTEMS</title>
+<style>
+:root{font-family:system-ui,sans-serif;color:#172c3f;background:#f3f6fa}body{margin:0}main{max-width:1200px;margin:auto;padding:28px}header{display:flex;justify-content:space-between;align-items:center;gap:20px}h1{font-size:26px;margin:8px 0}h2{font-size:19px}a{color:#1764ad}section{background:white;border:1px solid #dde5ee;border-radius:12px;padding:22px;margin:20px 0;overflow:auto}.checks{display:flex;flex-wrap:wrap;gap:10px}.check{padding:12px;border-radius:8px;background:#eef3f8}.ok{background:#e6f5ed;color:#165c39}.error,.critical{background:#ffeaea;color:#962828}.warning{background:#fff4d6;color:#715312}table{width:100%;border-collapse:collapse;font-size:13px}th,td{text-align:left;padding:11px;border-bottom:1px solid #e6ebf1;max-width:360px;overflow-wrap:anywhere}button,input,select{font:inherit;padding:9px 12px;border:1px solid #cad5e0;border-radius:6px}button{background:#155dad;color:white;cursor:pointer}button:disabled{opacity:.5;cursor:default}input,select{background:white}form{display:flex;flex-wrap:wrap;gap:12px;align-items:end}label{display:flex;flex-direction:column;gap:6px;font-size:13px}small,.muted{color:#526579}.notice{padding:12px;border-radius:8px;background:#e9f0f8;white-space:pre-wrap}.toolbar{display:flex;gap:12px;align-items:center}.hidden{display:none}code{font-size:12px}
+</style>
+</head>
+<body><main>
+<header><div><small>KYC SYSTEMS</small><h1>Operación del bot</h1><p id="identity" class="muted"></p></div><a href="/admin">Volver a usuarios</a></header>
+<p id="feedback" class="notice" role="status">Cargando…</p>
+<section><div class="toolbar"><h2>Salud del servicio</h2><button id="refresh">Actualizar</button><button id="check" class="owner hidden">Comprobar ahora</button></div><p id="checkedAt"></p><div id="checks" class="checks"></div><p class="muted">Los incidentes se registran en los logs del servidor. No se envían avisos externos.</p></section>
+<section><h2>Incidentes</h2><div id="alerts"></div></section>
+<section><h2>Trabajos pendientes o fallidos</h2><div id="jobs"></div></section>
+<section><h2>Entrega de respuestas</h2><p class="muted">Un envío incierto requiere revisar Twilio antes de repetirlo. Los estados de entrega se actualizan mediante callbacks.</p><div id="messages"></div></section>
+<section><h2>Consultas con resultado incierto</h2><div id="searches"></div></section>
+<section><h2>Reportes privados</h2><div id="reports"></div><div class="toolbar"><button id="previousReport">Anterior</button><span id="reportPage"></span><button id="nextReport">Siguiente</button></div></section>
+<section class="owner hidden"><h2>Administradores</h2><div id="admins"></div><h3>Crear cuenta individual</h3><form id="adminForm"><label>Usuario<input name="username" required minlength="3" maxlength="80" autocomplete="off"></label><label>Contraseña<input name="password" type="password" required minlength="12" autocomplete="new-password"></label><label>Rol<select name="role"><option value="admin">Administrador</option><option value="owner">Propietario</option></select></label><button>Crear</button></form><h3>Restablecer contraseña de una cuenta</h3><form id="resetForm"><label>ID de administrador<input name="id" type="number" min="1" required></label><label>Contraseña nueva<input name="password" type="password" minlength="12" required autocomplete="new-password"></label><button>Restablecer</button></form></section>
+<section><h2>Cambiar mi contraseña</h2><form id="passwordForm"><label>Contraseña actual<input name="currentPassword" type="password" required autocomplete="current-password"></label><label>Contraseña nueva<input name="password" type="password" required minlength="12" autocomplete="new-password"></label><button>Guardar y cerrar sesión</button></form></section>
+</main><script src="/admin/admin-client.js"></script><script src="/admin/operations.js"></script></body></html>

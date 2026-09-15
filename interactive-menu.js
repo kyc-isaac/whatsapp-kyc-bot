@@ -1,5 +1,6 @@
-// Módulo de Menús Interactivos para WhatsApp Business API
-// Compatible con Twilio WhatsApp API 2025
+// Prototipo histórico: no está conectado a server.js ni a la API de envío de Twilio.
+// Los menús activos y sus acciones están en enhanced-menus.js y bot-flow.js.
+// No usar estos objetos como opciones disponibles del bot; ver docs/BOT_REVIEW.md.
 
 /**
  * Menú Principal con Quick Reply Buttons
